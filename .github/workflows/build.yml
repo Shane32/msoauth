@@ -1,0 +1,50 @@
+name: Build & Publish beta
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - 'LICENSE'
+      - '.editorconfig'
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .npmrc file to publish to npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Install npm@10
+        run: npm i -g npm@10
+      - name: Install modules
+        run: npm ci
+      - name: Build
+        run: npm run build
+#      - name: Publish to npm
+#        run: npm publish --access public
+#        env:
+#          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Setup .npmrc file to publish to GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          registry-url: 'https://npm.pkg.github.com'
+      - name: Configure package name, url, and version
+        env:
+          github_repo: ${{ github.repository }}
+          ref: 0.0.${{ github.run_number }}-beta
+        run: node tools/updateurl $github_repo $ref
+      - name: Clean package.json
+        run: node tools/prepare-publish
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,35 @@
+name: Test
+
+on:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+#          - windows-latest
+        node: 
+#          - 12.x
+#          - 14.x
+#          - 16.x
+          - 18.x
+          - 20.x
+          - 22.x
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install npm@10
+        run: npm i -g npm@10
+      - name: Install modules - actor ${{ github.actor }} - version ${{ github.run_number }}
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Run tests
+        run: npm test
