@@ -7,7 +7,7 @@ interface IProps {
   children: ReactNode;
 }
 
-export function AuthProvider({ authManager, children }: IProps) {
+function AuthProvider({ authManager, children }: IProps) {
   // trigger a re-render when the auth state changes
   const [, setTrigger] = useState({});
 
@@ -32,3 +32,5 @@ export function AuthProvider({ authManager, children }: IProps) {
 
   return <AuthContext.Provider value={authManager}>{children}</AuthContext.Provider>;
 }
+
+export default AuthProvider;
