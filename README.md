@@ -20,6 +20,7 @@ npm install @shane32/msoauth
 ## Setup
 
 1. Register your application in the Azure Portal and configure the following:
+
    - Redirect URI (e.g., `https://localhost:12345/oauth/callback`)
    - Logout URI (e.g., `https://localhost:12345/oauth/logout`)
    - Required API permissions
@@ -28,7 +29,7 @@ npm install @shane32/msoauth
 2. Create an AuthManager instance in your `main.tsx` with your Azure AD configuration:
 
 ```typescript
-import { AuthManager, Policies } from '@shane32/msoauth';
+import { AuthManager, Policies } from "@shane32/msoauth";
 
 // Define your policies
 export enum Policies {
@@ -71,7 +72,7 @@ root.render(
         </Routes>
       </BrowserRouter>
     </AuthProvider>
-  </GraphQLContext.Provider>,
+  </GraphQLContext.Provider>
 );
 
 function OAuthCallback() {
@@ -217,7 +218,7 @@ useEffect(() => {
 ### User Information
 
 ```typescript
-import useAuth from '../hooks/useAuth';
+import useAuth from "../hooks/useAuth";
 
 function UserProfile() {
   const userInfo = useAuth().userInfo;
@@ -229,23 +230,23 @@ function UserProfile() {
 
 The `userInfo` property returns `null` when not authenticated or the contents of the ID token provided by Azure.
 
-| Property        | Type                  | Description                            |
-|-----------------|-----------------------|----------------------------------------|
-| `oid`           | `string`              | Unique identifier for the user         |
-| `name`          | `string \| undefined` | Display name of the user               |
-| `email`         | `string \| undefined` | Email address of the user              |
-| `given_name`    | `string \| undefined` | User's first name                      |
-| `family_name`   | `string \| undefined` | User's last name                       |
-| `roles`         | `string[]`            | Array of roles assigned to the user    |
-| `[key: string]` | `unknown`             | Additional custom claims in the JWT    |
+| Property        | Type                  | Description                         |
+| --------------- | --------------------- | ----------------------------------- |
+| `oid`           | `string`              | Unique identifier for the user      |
+| `name`          | `string \| undefined` | Display name of the user            |
+| `email`         | `string \| undefined` | Email address of the user           |
+| `given_name`    | `string \| undefined` | User's first name                   |
+| `family_name`   | `string \| undefined` | User's last name                    |
+| `roles`         | `string[]`            | Array of roles assigned to the user |
+| `[key: string]` | `unknown`             | Additional custom claims in the JWT |
 
 In order for the user information to be populated correctly, please configure the token within your Azure App Registration to include these claims in the ID token:
 
-| Claim           | Description |
-|-----------------|-------------|
-| `email`         | The addressable email for this user, if the user has one |
-| `family_name`   | Provides the last name, surname, or family name of the user as defined in the user object |
-| `given_name`    | Provides the first or "given" name of the user, as set on the user object |
+| Claim         | Description                                                                               |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `email`       | The addressable email for this user, if the user has one                                  |
+| `family_name` | Provides the last name, surname, or family name of the user as defined in the user object |
+| `given_name`  | Provides the first or "given" name of the user, as set on the user object                 |
 
 Other configured claims will also be provided through the `userInfo` object.
 
@@ -254,7 +255,7 @@ Other configured claims will also be provided through the `userInfo` object.
 Use the provided template components to conditionally render content based on authentication state:
 
 ```typescript
-import { AuthenticatedTemplate, UnauthenticatedTemplate } from '@shane32/msoauth';
+import { AuthenticatedTemplate, UnauthenticatedTemplate } from "@shane32/msoauth";
 
 function MyComponent() {
   return (
@@ -262,7 +263,7 @@ function MyComponent() {
       <AuthenticatedTemplate>
         <div>This content is only visible when authenticated</div>
       </AuthenticatedTemplate>
-      
+
       <UnauthenticatedTemplate>
         <div>This content is only visible when not authenticated</div>
       </UnauthenticatedTemplate>
@@ -276,36 +277,32 @@ function MyComponent() {
 ```typescript
 function LoginButton() {
   const auth = useAuth();
-  
+
   const handleLogin = () => {
     auth.login();
   };
-  
+
   const handleLogout = () => {
     auth.logout();
   };
-  
-  return auth.isAuthenticated() ? (
-    <button onClick={handleLogout}>Logout</button>
-  ) : (
-    <button onClick={handleLogin}>Login</button>
-  );
+
+  return auth.isAuthenticated() ? <button onClick={handleLogout}>Logout</button> : <button onClick={handleLogin}>Login</button>;
 }
 ```
 
 ### Policy-Based Authorization
 
 ```typescript
-import useAuth from '../hooks/useAuth';
-import { Policies } from '../main';
+import useAuth from "../hooks/useAuth";
+import { Policies } from "../main";
 
 function AdminPanel() {
   const auth = useAuth();
-  
+
   if (!auth.can(Policies.Admin)) {
     return <div>Access denied</div>;
   }
-  
+
   return <div>Admin panel content</div>;
 }
 ```
@@ -313,22 +310,22 @@ function AdminPanel() {
 ### Access Tokens
 
 ```typescript
-import useAuth from '../hooks/useAuth';
+import useAuth from "../hooks/useAuth";
 
 async function fetchData() {
   const auth = useAuth();
-  
+
   // Get token for your API
   const apiToken = await auth.getAccessToken();
-  
+
   // Get token for Microsoft Graph
   const msToken = await auth.getMsAccessToken();
-  
+
   // Use tokens in API calls
-  const response = await fetch('your-api-endpoint', {
+  const response = await fetch("your-api-endpoint", {
     headers: {
-      Authorization: `Bearer ${apiToken}`
-    }
+      Authorization: `Bearer ${apiToken}`,
+    },
   });
 }
 ```
@@ -338,8 +335,8 @@ async function fetchData() {
 The AuthManager provides an event system that allows you to respond to authentication-related events. When using event handlers in React components, it's important to properly set up and clean up event listeners using the `useEffect` hook:
 
 ```typescript
-import { useEffect } from 'react';
-import useAuth from '../hooks/useAuth';
+import { useEffect } from "react";
+import useAuth from "../hooks/useAuth";
 
 const auth = useAuth();
 
@@ -348,7 +345,7 @@ useEffect(() => {
   const handleLogin = () => {
     console.log("User logged in");
   };
-  
+
   const handleLogout = () => {
     console.log("User logged out");
   };
@@ -365,23 +362,23 @@ useEffect(() => {
 }, [auth]); // Include auth in dependencies array
 ```
 
-| Event Type      | Description |
-|-----------------|-------------|
-| `login`         | Emitted when a user successfully logs in |
-| `logout`        | Emitted when a user logs out or is logged out |
+| Event Type      | Description                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------- |
+| `login`         | Emitted when a user successfully logs in                                                  |
+| `logout`        | Emitted when a user logs out or is logged out                                             |
 | `tokensChanged` | Emitted when access tokens are refreshed or cleared, as user information may have changed |
 
 ## Configuration Options
 
-| Option              | Type     | Required | Description |
-|---------------------|----------|----------|-------------|
-| `clientId`          | `string` | Yes      | Azure AD application client ID |
-| `authority`         | `string` | Yes      | Azure AD authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
-| `scopes`            | `string` | Yes      | Space-separated list of required scopes |
-| `redirectUri`       | `string` | Yes      | OAuth callback URI (must start with '/') |
-| `navigateCallback`  | `(path: string) => void` | Yes | Function to handle navigation after auth callbacks |
-| `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes | Policy functions for authorization |
-| `logoutRedirectUri` | `string` | No       | URI to redirect to after logout (must start with '/') |
+| Option              | Type                                           | Required | Description                                                                         |
+| ------------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `clientId`          | `string`                                       | Yes      | Azure AD application client ID                                                      |
+| `authority`         | `string`                                       | Yes      | Azure AD authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
+| `scopes`            | `string`                                       | Yes      | Space-separated list of required scopes                                             |
+| `redirectUri`       | `string`                                       | Yes      | OAuth callback URI (must start with '/')                                            |
+| `navigateCallback`  | `(path: string) => void`                       | Yes      | Function to handle navigation after auth callbacks                                  |
+| `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes      | Policy functions for authorization                                                  |
+| `logoutRedirectUri` | `string`                                       | No       | URI to redirect to after logout (must start with '/')                               |
 
 ## Environment Variables
 
@@ -391,3 +388,4 @@ This library does not directly access environment variables, but for the example
 VITE_AZURE_CLIENT_ID=your-client-id
 VITE_AZURE_TENANT_ID=your-tenant-id
 VITE_AZURE_SCOPES=api://your-api-scope User.Read.All
+```

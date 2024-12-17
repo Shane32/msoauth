@@ -18,8 +18,8 @@
     "package": "npm run build && npm pack",
     "test": "jest --no-cache --runInBand",
     "test:cov": "jest --coverage --no-cache --runInBand",
-    "prettier": "prettier -w \"src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\" --end-of-line auto && prettier -w \"test/**/*.{js,jsx,ts,tsx,json,css,scss,md}\" --end-of-line auto",
-    "test-prettier": "prettier -c \"src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\" --end-of-line auto && prettier -c \"test/**/*.{js,jsx,ts,tsx,json,css,scss,md}\" --end-of-line auto"
+    "prettier": "prettier -w \"./**/*.{js,jsx,ts,tsx,json,css,scss,md}\" --end-of-line auto",
+    "test-prettier": "prettier -c \"./**/*.{js,jsx,ts,tsx,json,css,scss,md}\" --end-of-line auto"
   },
   "publishConfig": {
     "access": "restricted"
