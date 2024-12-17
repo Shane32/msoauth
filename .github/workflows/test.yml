@@ -29,9 +29,9 @@ jobs:
         run: npm i -g npm@10
       - name: Install modules - actor ${{ github.actor }} - version ${{ github.run_number }}
         run: npm ci
-      - name: Build
-        run: npm run build
       - name: Test formatting
         run: npm run test-prettier
+      - name: Build
+        run: npm run build
       - name: Run tests
         run: npm test
