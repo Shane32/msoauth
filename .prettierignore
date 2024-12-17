@@ -1,5 +1,7 @@
-*.md
-*.json
+package.json
+package-lock.json
 *.yml
 *.esproj
 *.sln
+.vs
+dist
