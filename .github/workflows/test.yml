@@ -31,5 +31,7 @@ jobs:
         run: npm ci
       - name: Build
         run: npm run build
+      - name: Test formatting
+        run: npm test-prettier
       - name: Run tests
         run: npm test
