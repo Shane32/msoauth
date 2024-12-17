@@ -7,4 +7,5 @@ export {
   NavigateCallback,
   PolicyFunction,
 } from "./AuthManager";
+export { default as AuthProvider } from "./AuthProvider";
 export { UserInfo } from "./AuthManager.helpers";
