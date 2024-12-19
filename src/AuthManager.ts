@@ -413,7 +413,7 @@ class AuthManager<TPolicyNames extends string = string> {
         refreshToken: msData.refresh_token,
         apiExpiresAt: Date.now() + apiData.expires_in * 1000,
         msExpiresAt: Date.now() + msData.expires_in * 1000,
-        idToken: apiData.id_token,
+        idToken: msData.id_token,
       };
       this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       localStorage.setItem(AuthManager.TOKEN_KEY, JSON.stringify(this.tokenInfo));
