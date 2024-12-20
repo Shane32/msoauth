@@ -389,3 +389,6 @@ VITE_AZURE_CLIENT_ID=your-client-id
 VITE_AZURE_TENANT_ID=your-tenant-id
 VITE_AZURE_SCOPES=api://your-api-scope User.Read.All
 ```
+
+- Use `common` for the tenant ID if your Azure App Registration is configured to allow access from multiple tenants and/or personal accounts.
+- Typically the API scope defaults to `api://your-client-id/scope-name` but you can customize this in the Azure App Registration
