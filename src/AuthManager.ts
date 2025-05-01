@@ -86,8 +86,8 @@ class AuthManager<TPolicyNames extends string = string> {
     // Default ID to "default" if not provided (for backward compatibility)
     this.id = config.id || "default";
 
-    const keyId = config.id ? `_${config.id}` : "";
     // Initialize provider-specific storage keys
+    const keyId = config.id ? `_${config.id}` : "";
     this.tokenKey = `auth_tokens${keyId}`;
     this.verifierKey = `auth_pkce_verifier${keyId}`;
     this.stateKey = `auth_state${keyId}`;
