@@ -26,6 +26,8 @@ export type PolicyFunction = (roles: string[]) => boolean;
  * Configuration object for AuthManager
  */
 export interface AuthManagerConfiguration<TPolicyNames extends string = string> {
+  /** Provider ID (optional, defaults to "default") */
+  id?: string;
   /** OAuth client ID */
   clientId: string;
   /** Base URL of the OAuth authority */
@@ -48,10 +50,15 @@ export interface AuthManagerConfiguration<TPolicyNames extends string = string> 
  * @template TPolicyNames - Enum type for policy keys
  */
 class AuthManager<TPolicyNames extends string = string> {
-  private static readonly TOKEN_KEY = "auth_tokens";
-  private static readonly VERIFIER_KEY = "auth_pkce_verifier";
-  private static readonly STATE_KEY = "auth_state";
-  private static readonly ORIGINAL_URL_KEY = "auth_original_url";
+  // Provider-specific storage keys
+  private readonly tokenKey: string;
+  private readonly verifierKey: string;
+  private readonly stateKey: string;
+  private readonly originalUrlKey: string;
+
+  // Add ID property
+  private readonly id: string;
+
   private tokenInfo: TokenInfo | null = null;
   private refreshPromise: Promise<void> | null = null;
   private eventListeners: Map<AuthEventType, Set<AuthEventListener>> = new Map();
@@ -76,6 +83,15 @@ class AuthManager<TPolicyNames extends string = string> {
       throw new Error('logoutRedirectUri must start with "/"');
     }
 
+    // Default ID to "default" if not provided (for backward compatibility)
+    this.id = config.id || "default";
+
+    // Initialize provider-specific storage keys
+    this.tokenKey = `auth_tokens_${this.id}`;
+    this.verifierKey = `auth_pkce_verifier_${this.id}`;
+    this.stateKey = `auth_state_${this.id}`;
+    this.originalUrlKey = `auth_original_url_${this.id}`;
+
     this.clientId = config.clientId;
     this.navigateCallback = config.navigateCallback;
     this.absoluteRedirectUri = `${window.location.origin}${config.redirectUri}`;
@@ -85,7 +101,7 @@ class AuthManager<TPolicyNames extends string = string> {
     this.configManager = new OpenIDConfigurationManager(config.authority);
 
     // Try to load tokens from storage
-    const stored = localStorage.getItem(AuthManager.TOKEN_KEY);
+    const stored = localStorage.getItem(this.tokenKey);
     if (stored) {
       this.tokenInfo = JSON.parse(stored);
       // Initialize userInfo from stored token
@@ -93,6 +109,14 @@ class AuthManager<TPolicyNames extends string = string> {
         this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
     }
+  }
+
+  /**
+   * Gets the provider ID
+   * @returns {string} The provider ID
+   */
+  public getId(): string {
+    return this.id;
   }
 
   // ====== Event handling ======
@@ -159,17 +183,17 @@ class AuthManager<TPolicyNames extends string = string> {
    */
   public async login(path?: string): Promise<void> {
     // Store current URL before redirecting
-    localStorage.setItem(AuthManager.ORIGINAL_URL_KEY, path || getCurrentRelativeUrl());
+    localStorage.setItem(this.originalUrlKey, path || getCurrentRelativeUrl());
 
     const pkce = await generatePKCECodes();
     const config = await this.configManager.getConfiguration();
 
     // Store verifier for later use
-    localStorage.setItem(AuthManager.VERIFIER_KEY, pkce.codeVerifier);
+    localStorage.setItem(this.verifierKey, pkce.codeVerifier);
 
     // Generate and store state
     const state = generateState();
-    localStorage.setItem(AuthManager.STATE_KEY, state);
+    localStorage.setItem(this.stateKey, state);
 
     const params = new URLSearchParams({
       client_id: this.clientId,
@@ -198,19 +222,19 @@ class AuthManager<TPolicyNames extends string = string> {
     }
 
     // Get stored code verifier
-    const codeVerifier = localStorage.getItem(AuthManager.VERIFIER_KEY);
+    const codeVerifier = localStorage.getItem(this.verifierKey);
     if (!codeVerifier) {
       throw new Error("No code verifier found");
     }
 
     // Verify state parameter
-    const storedState = localStorage.getItem(AuthManager.STATE_KEY);
+    const storedState = localStorage.getItem(this.stateKey);
     if (!storedState || storedState !== queryParams.get("state")) {
       throw new Error("Invalid state parameter");
     }
 
     // Clean up state
-    localStorage.removeItem(AuthManager.STATE_KEY);
+    localStorage.removeItem(this.stateKey);
 
     const config = await this.configManager.getConfiguration();
 
@@ -223,7 +247,7 @@ class AuthManager<TPolicyNames extends string = string> {
     });
 
     // Clean up verifier
-    localStorage.removeItem(AuthManager.VERIFIER_KEY);
+    localStorage.removeItem(this.verifierKey);
 
     const response = await fetch(config.token_endpoint, {
       method: "POST",
@@ -244,9 +268,9 @@ class AuthManager<TPolicyNames extends string = string> {
     this.emitEvent("login");
 
     // Restore original URL if it exists
-    const originalUrl = localStorage.getItem(AuthManager.ORIGINAL_URL_KEY);
+    const originalUrl = localStorage.getItem(this.originalUrlKey);
     if (originalUrl) {
-      localStorage.removeItem(AuthManager.ORIGINAL_URL_KEY);
+      localStorage.removeItem(this.originalUrlKey);
       this.navigateCallback(originalUrl);
     }
   }
@@ -258,7 +282,7 @@ class AuthManager<TPolicyNames extends string = string> {
    */
   public async logout(path?: string): Promise<void> {
     // Store current URL before redirecting
-    localStorage.setItem(AuthManager.ORIGINAL_URL_KEY, path || getCurrentRelativeUrl());
+    localStorage.setItem(this.originalUrlKey, path || getCurrentRelativeUrl());
 
     // First perform local logout
     this.localLogout();
@@ -284,9 +308,9 @@ class AuthManager<TPolicyNames extends string = string> {
    */
   public handleLogoutRedirect(): void {
     // Restore original URL if it exists
-    const originalUrl = localStorage.getItem(AuthManager.ORIGINAL_URL_KEY);
+    const originalUrl = localStorage.getItem(this.originalUrlKey);
     if (originalUrl) {
-      localStorage.removeItem(AuthManager.ORIGINAL_URL_KEY);
+      localStorage.removeItem(this.originalUrlKey);
       this.navigateCallback(originalUrl);
     } else {
       this.navigateCallback("/");
@@ -300,9 +324,9 @@ class AuthManager<TPolicyNames extends string = string> {
     this.tokenInfo = null;
     this.userInfo = null;
     this.configManager.clearCache();
-    localStorage.removeItem(AuthManager.TOKEN_KEY);
-    localStorage.removeItem(AuthManager.VERIFIER_KEY);
-    localStorage.removeItem(AuthManager.STATE_KEY);
+    localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.verifierKey);
+    localStorage.removeItem(this.stateKey);
     this.emitEvent("logout");
     this.emitEvent("tokensChanged");
   }
@@ -416,7 +440,7 @@ class AuthManager<TPolicyNames extends string = string> {
         idToken: msData.id_token,
       };
       this.userInfo = extractUserInfo(this.tokenInfo.idToken);
-      localStorage.setItem(AuthManager.TOKEN_KEY, JSON.stringify(this.tokenInfo));
+      localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
       this.emitEvent("tokensChanged");
     })();
 
