@@ -449,16 +449,16 @@ function LoginButtons() {
 
 ### AuthManager Configuration
 
-| Option              | Type                                           | Required | Description                                                                      |
-| ------------------- | ---------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
-| `id`                | `string`                                       | No       | Unique identifier for the provider (defaults to "default")                       |
-| `clientId`          | `string`                                       | Yes      | OAuth application client ID                                                      |
-| `authority`         | `string`                                       | Yes      | OAuth authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
-| `scopes`            | `string`                                       | Yes      | Space-separated list of required scopes                                          |
-| `redirectUri`       | `string`                                       | Yes      | OAuth callback URI (must start with '/')                                         |
-| `navigateCallback`  | `(path: string) => void`                       | Yes      | Function to handle navigation after auth callbacks                               |
-| `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes      | Policy functions for authorization                                               |
-| `logoutRedirectUri` | `string`                                       | No       | URI to redirect to after logout (must start with '/')                            |
+| Option              | Type                                           | Required | Description                                                                         |
+| ------------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `id`                | `string`                                       | No       | Unique identifier for the provider (defaults to "default")                          |
+| `clientId`          | `string`                                       | Yes      | Azure AD application client ID                                                      |
+| `authority`         | `string`                                       | Yes      | Azure AD authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
+| `scopes`            | `string`                                       | Yes      | Space-separated list of required scopes                                             |
+| `redirectUri`       | `string`                                       | Yes      | OAuth callback URI (must start with '/')                                            |
+| `navigateCallback`  | `(path: string) => void`                       | Yes      | Function to handle navigation after auth callbacks                                  |
+| `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes      | Policy functions for authorization                                                  |
+| `logoutRedirectUri` | `string`                                       | No       | URI to redirect to after logout (must start with '/')                               |
 
 ### MultiAuthProvider Props
 
