@@ -373,7 +373,7 @@ useEffect(() => {
 This library supports multiple OAuth providers, allowing you to configure and use different identity providers in your application.
 
 ```typescript
-import { AuthManager, MultiAuthProvider, ProxyAuthManager } from "@shane32/msoauth";
+import { AuthManager, MultiAuthProvider, useAuth } from "@shane32/msoauth";
 
 // Define your policies
 const policies = {
@@ -412,20 +412,25 @@ const googleProvider = new AuthManager({
 
 // Use MultiAuthProvider instead of AuthProvider
 root.render(
-  <MultiAuthProvider authManagers={[azureProvider, googleProvider]} defaultProviderId="azure">
+  <MultiAuthProvider authManagers={[azureProvider, googleProvider]}>
     <App />
   </MultiAuthProvider>
 );
 
 function LoginButtons() {
-  const auth = useContext(AuthContext);
+  // Get the active auth manager
+  const auth = useAuth();
+
+  // Get specific providers
+  const azureAuth = useAuth("azure");
+  const googleAuth = useAuth("google");
 
   const handleMicrosoftLogin = () => {
-    auth.login("/", "azure");
+    azureAuth.login("/");
   };
 
   const handleGoogleLogin = () => {
-    auth.login("/", "google");
+    googleAuth.login("/");
   };
 
   const handleLogout = () => {
@@ -459,13 +464,6 @@ function LoginButtons() {
 | `navigateCallback`  | `(path: string) => void`                       | Yes      | Function to handle navigation after auth callbacks                                  |
 | `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes      | Policy functions for authorization                                                  |
 | `logoutRedirectUri` | `string`                                       | No       | URI to redirect to after logout (must start with '/')                               |
-
-### MultiAuthProvider Props
-
-| Option              | Type            | Required | Description                                              |
-| ------------------- | --------------- | -------- | -------------------------------------------------------- |
-| `authManagers`      | `AuthManager[]` | Yes      | Array of AuthManager instances                           |
-| `defaultProviderId` | `string`        | No       | Default provider ID to use when no provider is specified |
 
 ## Environment Variables
 

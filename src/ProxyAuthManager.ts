@@ -6,7 +6,6 @@ import AuthManager, { AuthManagerConfiguration, PolicyFunction } from "./AuthMan
  */
 class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager<TPolicyNames> {
   private providers: Map<string, AuthManager<TPolicyNames>> = new Map();
-  private defaultProviderId: string;
 
   /**
    * Creates a new instance of ProxyAuthManager
@@ -14,7 +13,7 @@ class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager
    * @param {string} [defaultProviderId] - The default provider ID
    * @throws {Error} If no providers are provided, if there are duplicate provider IDs, or if the default provider ID is invalid
    */
-  constructor(providers: AuthManager<TPolicyNames>[], defaultProviderId?: string) {
+  constructor(providers: AuthManager<TPolicyNames>[]) {
     // Validate providers
     if (!providers || providers.length === 0) {
       throw new Error("At least one provider must be specified");
@@ -44,17 +43,6 @@ class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager
       usedIds.add(id);
       this.providers.set(id, provider);
     });
-
-    // Validate and set default provider ID
-    if (defaultProviderId) {
-      if (!this.providers.has(defaultProviderId)) {
-        throw new Error(`Default provider ID "${defaultProviderId}" not found`);
-      }
-      this.defaultProviderId = defaultProviderId;
-    } else {
-      // If no default provider is specified, use the first provider
-      this.defaultProviderId = providers[0].id;
-    }
   }
 
   /**
@@ -66,36 +54,19 @@ class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager
   }
 
   /**
-   * Gets the default provider ID
-   * @returns {string} The default provider ID
-   */
-  public getDefaultProviderId(): string {
-    return this.defaultProviderId;
-  }
-
-  /**
    * Initiates the OAuth login flow with the specified provider
-   * @param {string} [path] - Optional path to redirect after login
-   * @param {string} [providerId] - Optional provider ID to use for login
+   * @throws {Error} This method is disabled in ProxyAuthManager
    */
-  public async login(path?: string, providerId?: string): Promise<void> {
-    const provider = this.providers.get(providerId || this.defaultProviderId);
-    if (!provider) {
-      throw new Error(`Provider with ID "${providerId}" not found`);
-    }
-    await provider.login(path);
+  public async login(): Promise<void> {
+    throw new Error("Direct login is not supported. Use the login function from AuthContext instead.");
   }
 
   /**
    * Handles the OAuth redirect callback
-   * Tries each provider until one successfully handles the redirect
+   * @throws {Error} This method is disabled in ProxyAuthManager
    */
-  public async handleRedirect(providerId?: string): Promise<void> {
-    const provider = this.providers.get(providerId || this.defaultProviderId);
-    if (!provider) {
-      throw new Error(`Provider with ID "${providerId}" not found`);
-    }
-    await provider.handleRedirect();
+  public async handleRedirect(): Promise<void> {
+    throw new Error("Direct handleRedirect is not supported. Use the handleRedirect function from AuthContext instead.");
   }
 
   /**

@@ -173,9 +173,8 @@ class AuthManager<TPolicyNames extends string = string> {
    * Initiates the OAuth login flow with PKCE
    * Redirects to the OAuth provider's authorization endpoint
    * @param {string} [path] - Optional path to redirect after login
-   * @param {string} [providerId] - Optional provider ID (ignored in base AuthManager)
    */
-  public async login(path?: string, providerId?: string): Promise<void> {
+  public async login(path?: string): Promise<void> {
     // Store current URL before redirecting
     localStorage.setItem(this.originalUrlKey, path || getCurrentRelativeUrl());
 
@@ -205,10 +204,9 @@ class AuthManager<TPolicyNames extends string = string> {
   /**
    * Handles the OAuth redirect callback
    * Exchanges the authorization code for tokens and immediately refreshes them
-   * @param {string} [providerId] - Optional provider ID (ignored in base AuthManager)
    * @throws {Error} If authorization code is missing or invalid
    */
-  public async handleRedirect(providerId?: string): Promise<void> {
+  public async handleRedirect(): Promise<void> {
     // Parse the query string
     const queryParams = new URLSearchParams(window.location.search);
     const code = queryParams.get("code");
