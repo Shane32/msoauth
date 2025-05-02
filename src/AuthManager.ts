@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import {
   extractUserInfo,
+  convertTokenInfoToV2,
   generatePKCECodes,
   generateState,
   getCurrentRelativeUrl,
   TokenInfo,
+  TokenInfoV1,
   TokenResponse,
   UserInfo,
 } from "./AuthManager.helpers";
@@ -23,6 +25,16 @@ export type NavigateCallback = (
 export type PolicyFunction = (roles: string[]) => boolean;
 
 /**
+ * Represents a set of OAuth scopes with a name
+ */
+export interface ScopeSet {
+  /** Name of the scope set */
+  name: string;
+  /** Space-delimited string of OAuth scopes */
+  scopes: string;
+}
+
+/**
  * Configuration object for AuthManager
  */
 export interface AuthManagerConfiguration<TPolicyNames extends string = string> {
@@ -32,8 +44,10 @@ export interface AuthManagerConfiguration<TPolicyNames extends string = string> 
   clientId: string;
   /** Base URL of the OAuth authority */
   authority: string;
-  /** OAuth scopes requested */
+  /** OAuth scopes requested (for backward compatibility, used as default scope set) */
   scopes: string;
+  /** Additional named scope sets */
+  scopeSets?: ScopeSet[];
   /** URI where the OAuth provider will redirect after login */
   redirectUri: string;
   /** Function to handle navigation in the app */
@@ -66,7 +80,9 @@ class AuthManager<TPolicyNames extends string = string> {
   private readonly absoluteRedirectUri: string;
   private readonly absoluteLogoutRedirectUri: string | undefined;
   private readonly policies: Record<TPolicyNames, PolicyFunction>;
-  private readonly scopes: string;
+  private readonly defaultScopes: string;
+  private readonly allScopes: string;
+  private readonly scopeSets: Map<string, string> = new Map();
   private readonly clientId: string;
   private readonly navigateCallback: NavigateCallback;
   public userInfo: UserInfo | null = null;
@@ -98,15 +114,43 @@ class AuthManager<TPolicyNames extends string = string> {
     this.absoluteRedirectUri = `${window.location.origin}${config.redirectUri}`;
     this.absoluteLogoutRedirectUri = config.logoutRedirectUri ? `${window.location.origin}${config.logoutRedirectUri}` : undefined;
     this.policies = config.policies;
-    this.scopes = `openid profile offline_access ${config.scopes}`;
+
+    // Initialize scopes as requested
+    this.defaultScopes = config.scopes;
+    this.scopeSets.set("default", this.defaultScopes);
+
+    // Initialize allScopes with default scopes
+    let allScopesList = this.defaultScopes.split(" ").filter((s) => s.trim() !== "");
+
+    // Add additional scope sets from config
+    if (config.scopeSets) {
+      for (const scopeSet of config.scopeSets) {
+        this.scopeSets.set(scopeSet.name, scopeSet.scopes);
+        // Add unique scopes to allScopesList
+        const scopesArray = scopeSet.scopes.split(" ").filter((s) => s.trim() !== "");
+        for (const scope of scopesArray) {
+          if (!allScopesList.includes(scope)) {
+            allScopesList.push(scope);
+          }
+        }
+      }
+    }
+
+    // Set allScopes as a space-separated string of all unique scopes
+    this.allScopes = allScopesList.join(" ");
+
     this.configManager = new OpenIDConfigurationManager(config.authority);
 
     // Try to load tokens from storage
     const stored = localStorage.getItem(this.tokenKey);
     if (stored) {
-      this.tokenInfo = JSON.parse(stored);
+      const parsedToken = JSON.parse(stored);
+
+      // Convert from version 1 to version 2 if needed
+      this.tokenInfo = convertTokenInfoToV2(parsedToken);
+
       // Initialize userInfo from stored token
-      if (this.tokenInfo && this.tokenInfo.version === 1) {
+      if (this.tokenInfo && this.tokenInfo.version === 2) {
         this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
     }
@@ -192,7 +236,7 @@ class AuthManager<TPolicyNames extends string = string> {
       client_id: this.clientId,
       redirect_uri: this.absoluteRedirectUri,
       response_type: "code",
-      scope: this.scopes,
+      scope: this.allScopes,
       state,
       code_challenge_method: "S256",
       code_challenge: pkce.codeChallenge,
@@ -325,41 +369,35 @@ class AuthManager<TPolicyNames extends string = string> {
   }
 
   /**
-   * Gets a valid access token for API requests
+   * Gets a valid access token for the specified scope set
+   * @param {string} [scopeSetName="default"] - The name of the scope set to get the token for
    * @returns {Promise<string>} A valid access token
-   * @throws {Error} If not authenticated or token refresh fails
+   * @throws {Error} If not authenticated, token refresh fails, or scope set doesn't exist
    */
-  public async getAccessToken(): Promise<string> {
+  public async getAccessToken(scopeSetName: string = "default"): Promise<string> {
     if (!this.tokenInfo) {
       throw new Error("Not authenticated");
+    }
+
+    if (!this.scopeSets.has(scopeSetName)) {
+      throw new Error(`Scope set '${scopeSetName}' does not exist`);
     }
 
     if (this.isTokenExpired()) {
       await this.refreshTokens();
     }
 
-    return this.tokenInfo.apiAccessToken;
+    const token = this.tokenInfo.accessTokens[scopeSetName]?.token;
+    if (!token) {
+      throw new Error(`No token available for scope set '${scopeSetName}'`);
+    }
+
+    return token;
   }
 
   /**
-   * Gets a valid access token for MS Graph requests
-   * @returns {Promise<string>} A valid access token
-   * @throws {Error} If not authenticated or token refresh fails
-   */
-  public async getMsAccessToken(): Promise<string> {
-    if (!this.tokenInfo) {
-      throw new Error("Not authenticated");
-    }
-
-    if (this.isTokenExpired()) {
-      await this.refreshTokens();
-    }
-
-    return this.tokenInfo.msAccessToken;
-  }
-
-  /**
-   * Refreshes both API and MS Graph access tokens using the refresh token
+   * Refreshes all access tokens using the refresh token
+   * @param {string} [refreshToken] - Optional refresh token to use
    * @throws {Error} If token refresh fails
    */
   private async refreshTokens(refreshToken?: string): Promise<void> {
@@ -370,69 +408,79 @@ class AuthManager<TPolicyNames extends string = string> {
 
     this.refreshPromise = (async () => {
       const config = await this.configManager.getConfiguration();
+      let currentRefreshToken = refreshToken ?? this.tokenInfo?.refreshToken;
 
-      // Split scopes into API and MS Graph scopes
-      const scopes = this.scopes.split(" ");
-      const apiScopes = scopes.filter((s) => s.startsWith("api://"));
-      const msScopes = scopes.filter((s) => !s.startsWith("api://"));
-
-      // Refresh API token
-      const apiParams = new URLSearchParams({
-        grant_type: "refresh_token",
-        client_id: this.clientId,
-        refresh_token: refreshToken ?? this.tokenInfo!.refreshToken,
-        scope: apiScopes.join(" "),
-      });
-
-      const apiResponse = await fetch(config.token_endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: apiParams.toString(),
-      });
-
-      if (!apiResponse.ok) {
-        this.localLogout();
-        throw new Error("Failed to refresh API token");
+      if (!currentRefreshToken) {
+        throw new Error("No refresh token available");
       }
 
-      const apiData: TokenResponse = await apiResponse.json();
-
-      // Refresh MS Graph token
-      const msParams = new URLSearchParams({
-        grant_type: "refresh_token",
-        client_id: this.clientId,
-        refresh_token: apiData.refresh_token,
-        scope: msScopes.join(" "),
-      });
-
-      const msResponse = await fetch(config.token_endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: msParams.toString(),
-      });
-
-      if (!msResponse.ok) {
-        this.localLogout();
-        throw new Error("Failed to refresh MS Graph token");
+      // Initialize token info if needed
+      if (!this.tokenInfo) {
+        this.tokenInfo = {
+          version: 2,
+          refreshToken: currentRefreshToken,
+          idToken: "",
+          accessTokens: {},
+        };
       }
 
-      const msData: TokenResponse = await msResponse.json();
+      // Refresh tokens for all scope sets
+      const scopeEntries = Array.from(this.scopeSets.entries());
+      for (let i = 0; i < scopeEntries.length; i++) {
+        const [scopeSetName, scopes] = scopeEntries[i];
 
-      // Update tokens with both responses
-      this.tokenInfo = {
-        version: 1,
-        apiAccessToken: apiData.access_token,
-        msAccessToken: msData.access_token,
-        refreshToken: msData.refresh_token,
-        apiExpiresAt: Date.now() + apiData.expires_in * 1000,
-        msExpiresAt: Date.now() + msData.expires_in * 1000,
-        idToken: msData.id_token,
-      };
-      this.userInfo = extractUserInfo(this.tokenInfo.idToken);
+        if (!scopes || scopes.trim() === "") continue;
+
+        const params = new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: this.clientId,
+          refresh_token: currentRefreshToken,
+          scope: scopes,
+        });
+
+        const response = await fetch(config.token_endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+        });
+
+        if (!response.ok) {
+          this.localLogout();
+          throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
+        }
+
+        const data: TokenResponse = await response.json();
+
+        // Update the refresh token for subsequent requests
+        currentRefreshToken = data.refresh_token;
+
+        // Update the token info
+        if (!this.tokenInfo.accessTokens) {
+          this.tokenInfo.accessTokens = {};
+        }
+
+        this.tokenInfo.accessTokens[scopeSetName] = {
+          token: data.access_token,
+          expiresAt: Date.now() + data.expires_in * 1000,
+        };
+
+        // Update ID token if present
+        if (data.id_token) {
+          this.tokenInfo.idToken = data.id_token;
+        }
+      }
+
+      // Update the refresh token with the latest one
+      this.tokenInfo.refreshToken = currentRefreshToken;
+
+      // Update user info from ID token
+      if (this.tokenInfo.idToken) {
+        this.userInfo = extractUserInfo(this.tokenInfo.idToken);
+      }
+
+      // Save tokens to local storage
       localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
       this.emitEvent("tokensChanged");
     })();
@@ -445,14 +493,24 @@ class AuthManager<TPolicyNames extends string = string> {
   }
 
   /**
-   * Checks if either access token is expired
-   * @returns {boolean} True if either token is expired or close to expiring
+   * Checks if any access token is expired
+   * @returns {boolean} True if any token is expired or close to expiring
    */
   private isTokenExpired(): boolean {
-    if (!this.tokenInfo) return true;
+    if (!this.tokenInfo || !this.tokenInfo.accessTokens) return true;
+
     const now = Date.now();
-    // Refresh if either token has less than 5 minutes remaining
-    return this.tokenInfo.apiExpiresAt - now < 5 * 60 * 1000 || this.tokenInfo.msExpiresAt - now < 5 * 60 * 1000;
+    const expirationBuffer = 5 * 60 * 1000; // 5 minutes
+
+    // Check if any token is expired or missing
+    for (const scope of Array.from(this.scopeSets.keys())) {
+      const tokenInfo = this.tokenInfo.accessTokens[scope];
+      if (!tokenInfo || tokenInfo.expiresAt - now < expirationBuffer) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
