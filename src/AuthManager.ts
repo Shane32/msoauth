@@ -502,9 +502,10 @@ class AuthManager<TPolicyNames extends string = string> {
     const now = Date.now();
     const expirationBuffer = 5 * 60 * 1000; // 5 minutes
 
-    // Check if any token is expired
-    for (const tokenInfo of Object.values(this.tokenInfo.accessTokens)) {
-      if (tokenInfo.expiresAt - now < expirationBuffer) {
+    // Check if any token is expired or missing
+    for (const scope of Array.from(this.scopeSets.keys())) {
+      const tokenInfo = this.tokenInfo.accessTokens[scope];
+      if (!tokenInfo || tokenInfo.expiresAt - now < expirationBuffer) {
         return true;
       }
     }
