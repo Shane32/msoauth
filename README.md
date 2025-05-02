@@ -368,10 +368,49 @@ useEffect(() => {
 | `logout`        | Emitted when a user logs out or is logged out                                             |
 | `tokensChanged` | Emitted when access tokens are refreshed or cleared, as user information may have changed |
 
+### Multiple OAuth Providers
+
+This library supports multiple OAuth providers, allowing you to configure and use different identity providers in your application. Use `MultiAuthProvider` to configure all your identity providers, and use the `useAuth` hook to login and handle redirects.
+
+```typescript
+// Use MultiAuthProvider instead of AuthProvider
+root.render(
+  <MultiAuthProvider authManagers={[azureProvider, googleProvider]}>
+    <App />
+  </MultiAuthProvider>
+);
+
+function LoginButtons() {
+  const auth = useAuth(); // logged-in manager
+  const azureAuth = useAuth("azure"); // azure manager
+  const googleAuth = useAuth("google"); // google manager
+
+  if (auth.isAuthenticated()) {
+    return <button onClick={() => { auth.logout(); })}>Logout</button>;
+  }
+
+  return (
+    <div>
+      <button onClick={() => { azureAuth.login('/'); }}>Login with Microsoft</button>
+      <button onClick={() => { googleAuth.login('/'); }}>Login with Google</button>
+    </div>
+  );
+}
+
+function AzureOAuthCallback() {
+  const azureAuth = useAuth("azure");
+  useEffect(() => {
+    azureAuth.handleRedirect();
+  }, [azureAuth]);
+  return <div>Processing login...</div>;
+}
+```
+
 ## Configuration Options
 
 | Option              | Type                                           | Required | Description                                                                         |
 | ------------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| `id`                | `string`                                       | No       | Unique identifier for the provider (defaults to "default")                          |
 | `clientId`          | `string`                                       | Yes      | Azure AD application client ID                                                      |
 | `authority`         | `string`                                       | Yes      | Azure AD authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
 | `scopes`            | `string`                                       | Yes      | Space-separated list of required scopes                                             |

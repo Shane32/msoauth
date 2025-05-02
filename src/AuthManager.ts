@@ -57,7 +57,7 @@ class AuthManager<TPolicyNames extends string = string> {
   private readonly originalUrlKey: string;
 
   // Add ID property
-  private readonly id: string;
+  readonly id: string;
 
   private tokenInfo: TokenInfo | null = null;
   private refreshPromise: Promise<void> | null = null;
@@ -110,14 +110,6 @@ class AuthManager<TPolicyNames extends string = string> {
         this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
     }
-  }
-
-  /**
-   * Gets the provider ID
-   * @returns {string} The provider ID
-   */
-  public getId(): string {
-    return this.id;
   }
 
   // ====== Event handling ======
