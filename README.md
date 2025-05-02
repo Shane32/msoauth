@@ -184,7 +184,7 @@ useEffect(() => {
   const fetchUsers = async () => {
     try {
       // Get MS Graph access token
-      const token = await auth.getMsAccessToken();
+      const token = await auth.getAccessToken("ms");
 
       // Fetch users from MS Graph API
       const response = await fetch("https://graph.microsoft.com/v1.0/users", {
@@ -319,7 +319,7 @@ async function fetchData() {
   const apiToken = await auth.getAccessToken();
 
   // Get token for Microsoft Graph
-  const msToken = await auth.getMsAccessToken();
+  const msToken = await auth.getAccessToken("ms");
 
   // Use tokens in API calls
   const response = await fetch("your-api-endpoint", {
@@ -431,3 +431,144 @@ VITE_AZURE_SCOPES=api://your-api-scope User.Read.All
 
 - Use `common` for the tenant ID if your Azure App Registration is configured to allow access from multiple tenants and/or personal accounts.
 - Typically the API scope defaults to `api://your-client-id/scope-name` but you can customize this in the Azure App Registration
+
+## Google OAuth Configuration
+
+This library also supports Google OAuth authentication. Since Google requires a client secret for token exchange, which cannot be securely stored in client-side applications, you need to set up a proxy endpoint on your server to handle token requests.
+
+### 1. Register your application in the Google Cloud Console
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Navigate to "APIs & Services" > "Credentials"
+4. Click "Create Credentials" > "OAuth client ID"
+5. Select "Web application" as the application type
+6. Add your authorized JavaScript origins (e.g., `https://localhost:12345`)
+7. Add your authorized redirect URIs (e.g., `https://localhost:12345/oauth/callback`)
+8. Note your Client ID and Client Secret
+
+### 2. Create a GoogleAuthManager instance in your `main.tsx`
+
+```typescript
+import { GoogleAuthManager, Policies } from "@shane32/msoauth";
+
+// Initialize GoogleAuthManager
+const authManager = new GoogleAuthManager({
+  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  authority: "https://accounts.google.com",
+  scopes: "https://www.googleapis.com/auth/userinfo.email", // Add any additional scopes you need
+  redirectUri: "/oauth/callback",
+  navigateCallback: (path: string) => {
+    window.history.replaceState({}, "", path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  },
+  policies,
+  logoutRedirectUri: "/oauth/logout",
+  proxyUrl: import.meta.env.VITE_GOOGLE_PROXY_URL, // URL to your proxy endpoint
+});
+```
+
+### 3. Set up a proxy endpoint in your ASP.NET Core backend
+
+Create a controller to handle token requests:
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using System.Net.Http;
+using System.Threading.Tasks;
+
+[ApiController]
+[Route("api/[controller]")]
+public class GoogleAuthProxyController : ControllerBase
+{
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
+
+    public GoogleAuthProxyController(IHttpClientFactory httpClientFactory, IConfiguration configuration)
+    {
+        _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> ProxyTokenRequest()
+    {
+        // Read the form data from the request
+        var formData = await Request.ReadFormAsync();
+
+        // Create a dictionary from the form data
+        var requestDict = formData.ToDictionary(x => x.Key, x => x.Value.ToString());
+
+        // Add the client secret to the request body
+        requestDict["client_secret"] = _configuration["Authentication:Google:ClientSecret"];
+
+        // Create a new form collection to send to Google
+        var requestContent = new FormUrlEncodedContent(requestDict);
+
+        // Determine the token endpoint based on the grant type
+        string tokenEndpoint = "https://oauth2.googleapis.com/token";
+
+        // Create an HTTP client
+        var client = _httpClientFactory.CreateClient();
+
+        // Forward the request to Google
+        var response = await client.PostAsync(tokenEndpoint, requestContent);
+
+        // Read the response content
+        var responseContent = await response.Content.ReadAsStringAsync();
+
+        // Return the response with the same status code
+        return new ContentResult
+        {
+            Content = responseContent,
+            ContentType = "application/json",
+            StatusCode = (int)response.StatusCode
+        };
+    }
+}
+```
+
+### 4. Configure your ASP.NET Core application
+
+Add the following to your `Program.cs` or `Startup.cs`:
+
+```csharp
+// Add HTTP client factory
+builder.Services.AddHttpClient();
+
+// Configure CORS to allow requests from your frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("https://localhost:12345") // Your frontend URL
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+// In the Configure method or middleware section
+app.UseCors("AllowFrontend");
+```
+
+### 5. Add the Google client secret to your configuration
+
+In your `appsettings.json` or environment variables:
+
+```json
+{
+  "Authentication": {
+    "Google": {
+      "ClientId": "your-client-id",
+      "ClientSecret": "your-client-secret"
+    }
+  }
+}
+```
+
+### 6. Environment Variables for your frontend
+
+```env
+VITE_GOOGLE_CLIENT_ID=your-client-id
+VITE_GOOGLE_PROXY_URL=https://your-backend-url/api/GoogleAuthProxy
+```
