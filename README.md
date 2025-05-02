@@ -368,17 +368,104 @@ useEffect(() => {
 | `logout`        | Emitted when a user logs out or is logged out                                             |
 | `tokensChanged` | Emitted when access tokens are refreshed or cleared, as user information may have changed |
 
+### Multiple OAuth Providers
+
+This library supports multiple OAuth providers, allowing you to configure and use different identity providers in your application.
+
+```typescript
+import { AuthManager, MultiAuthProvider, ProxyAuthManager } from "@shane32/msoauth";
+
+// Define your policies
+const policies = {
+  Admin: (roles: string[]) => roles.includes("Admin"),
+};
+
+// Common navigation callback
+const navigateCallback = (path: string) => {
+  window.history.replaceState({}, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+};
+
+// Initialize Azure AD provider
+const azureProvider = new AuthManager({
+  id: "azure", // Provider ID
+  clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
+  authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}/v2.0`,
+  scopes: import.meta.env.VITE_AZURE_SCOPES,
+  redirectUri: "/oauth/callback",
+  navigateCallback,
+  policies,
+  logoutRedirectUri: "/oauth/logout",
+});
+
+// Initialize Google provider
+const googleProvider = new AuthManager({
+  id: "google", // Provider ID
+  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  authority: "https://accounts.google.com",
+  scopes: import.meta.env.VITE_GOOGLE_SCOPES,
+  redirectUri: "/oauth/callback",
+  navigateCallback,
+  policies,
+  logoutRedirectUri: "/oauth/logout",
+});
+
+// Use MultiAuthProvider instead of AuthProvider
+root.render(
+  <MultiAuthProvider authManagers={[azureProvider, googleProvider]} defaultProviderId="azure">
+    <App />
+  </MultiAuthProvider>
+);
+
+function LoginButtons() {
+  const auth = useContext(AuthContext);
+
+  const handleMicrosoftLogin = () => {
+    auth.login("/", "azure");
+  };
+
+  const handleGoogleLogin = () => {
+    auth.login("/", "google");
+  };
+
+  const handleLogout = () => {
+    auth.logout();
+  };
+
+  if (auth.isAuthenticated()) {
+    return <button onClick={handleLogout}>Logout</button>;
+  }
+
+  return (
+    <div>
+      <button onClick={handleMicrosoftLogin}>Login with Microsoft</button>
+      <button onClick={handleGoogleLogin}>Login with Google</button>
+    </div>
+  );
+}
+```
+
 ## Configuration Options
 
-| Option              | Type                                           | Required | Description                                                                         |
-| ------------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
-| `clientId`          | `string`                                       | Yes      | Azure AD application client ID                                                      |
-| `authority`         | `string`                                       | Yes      | Azure AD authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
-| `scopes`            | `string`                                       | Yes      | Space-separated list of required scopes                                             |
-| `redirectUri`       | `string`                                       | Yes      | OAuth callback URI (must start with '/')                                            |
-| `navigateCallback`  | `(path: string) => void`                       | Yes      | Function to handle navigation after auth callbacks                                  |
-| `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes      | Policy functions for authorization                                                  |
-| `logoutRedirectUri` | `string`                                       | No       | URI to redirect to after logout (must start with '/')                               |
+### AuthManager Configuration
+
+| Option              | Type                                           | Required | Description                                                                      |
+| ------------------- | ---------------------------------------------- | -------- | -------------------------------------------------------------------------------- |
+| `id`                | `string`                                       | No       | Unique identifier for the provider (defaults to "default")                       |
+| `clientId`          | `string`                                       | Yes      | OAuth application client ID                                                      |
+| `authority`         | `string`                                       | Yes      | OAuth authority URL (e.g., `https://login.microsoftonline.com/{tenant-id}/v2.0`) |
+| `scopes`            | `string`                                       | Yes      | Space-separated list of required scopes                                          |
+| `redirectUri`       | `string`                                       | Yes      | OAuth callback URI (must start with '/')                                         |
+| `navigateCallback`  | `(path: string) => void`                       | Yes      | Function to handle navigation after auth callbacks                               |
+| `policies`          | `Record<string, (roles: string[]) => boolean>` | Yes      | Policy functions for authorization                                               |
+| `logoutRedirectUri` | `string`                                       | No       | URI to redirect to after logout (must start with '/')                            |
+
+### MultiAuthProvider Props
+
+| Option              | Type            | Required | Description                                              |
+| ------------------- | --------------- | -------- | -------------------------------------------------------- |
+| `authManagers`      | `AuthManager[]` | Yes      | Array of AuthManager instances                           |
+| `defaultProviderId` | `string`        | No       | Default provider ID to use when no provider is specified |
 
 ## Environment Variables
 
