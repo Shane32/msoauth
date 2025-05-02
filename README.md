@@ -370,46 +370,9 @@ useEffect(() => {
 
 ### Multiple OAuth Providers
 
-This library supports multiple OAuth providers, allowing you to configure and use different identity providers in your application.
+This library supports multiple OAuth providers, allowing you to configure and use different identity providers in your application. Use `MultiAuthProvider` to configure all your identity providers, and use the `useAuth` hook to login and handle redirects.
 
 ```typescript
-import { AuthManager, MultiAuthProvider, useAuth } from "@shane32/msoauth";
-
-// Define your policies
-const policies = {
-  Admin: (roles: string[]) => roles.includes("Admin"),
-};
-
-// Common navigation callback
-const navigateCallback = (path: string) => {
-  window.history.replaceState({}, "", path);
-  window.dispatchEvent(new PopStateEvent("popstate"));
-};
-
-// Initialize Azure AD provider
-const azureProvider = new AuthManager({
-  id: "azure", // Provider ID
-  clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
-  authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}/v2.0`,
-  scopes: import.meta.env.VITE_AZURE_SCOPES,
-  redirectUri: "/oauth/callback",
-  navigateCallback,
-  policies,
-  logoutRedirectUri: "/oauth/logout",
-});
-
-// Initialize Google provider
-const googleProvider = new AuthManager({
-  id: "google", // Provider ID
-  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-  authority: "https://accounts.google.com",
-  scopes: import.meta.env.VITE_GOOGLE_SCOPES,
-  redirectUri: "/oauth/callback",
-  navigateCallback,
-  policies,
-  logoutRedirectUri: "/oauth/logout",
-});
-
 // Use MultiAuthProvider instead of AuthProvider
 root.render(
   <MultiAuthProvider authManagers={[azureProvider, googleProvider]}>
@@ -418,41 +381,32 @@ root.render(
 );
 
 function LoginButtons() {
-  // Get the active auth manager
-  const auth = useAuth();
-
-  // Get specific providers
-  const azureAuth = useAuth("azure");
-  const googleAuth = useAuth("google");
-
-  const handleMicrosoftLogin = () => {
-    azureAuth.login("/");
-  };
-
-  const handleGoogleLogin = () => {
-    googleAuth.login("/");
-  };
-
-  const handleLogout = () => {
-    auth.logout();
-  };
+  const auth = useAuth(); // logged-in manager
+  const azureAuth = useAuth("azure"); // azure manager
+  const googleAuth = useAuth("google"); // google manager
 
   if (auth.isAuthenticated()) {
-    return <button onClick={handleLogout}>Logout</button>;
+    return <button onClick={() => { auth.logout(); })}>Logout</button>;
   }
 
   return (
     <div>
-      <button onClick={handleMicrosoftLogin}>Login with Microsoft</button>
-      <button onClick={handleGoogleLogin}>Login with Google</button>
+      <button onClick={() => { azureAuth.login('/'); }}>Login with Microsoft</button>
+      <button onClick={() => { googleAuth.login('/'); }}>Login with Google</button>
     </div>
   );
+}
+
+function AzureOAuthCallback() {
+  const azureAuth = useAuth("azure");
+  useEffect(() => {
+    azureAuth.handleRedirect();
+  }, [azureAuth]);
+  return <div>Processing login...</div>;
 }
 ```
 
 ## Configuration Options
-
-### AuthManager Configuration
 
 | Option              | Type                                           | Required | Description                                                                         |
 | ------------------- | ---------------------------------------------- | -------- | ----------------------------------------------------------------------------------- |

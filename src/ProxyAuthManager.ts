@@ -46,19 +46,11 @@ class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager
   }
 
   /**
-   * Gets all available providers
-   * @returns {Map<string, AuthManager<TPolicyNames>>} Map of provider ID to provider
-   */
-  public getProviders(): Map<string, AuthManager<TPolicyNames>> {
-    return this.providers;
-  }
-
-  /**
    * Initiates the OAuth login flow with the specified provider
    * @throws {Error} This method is disabled in ProxyAuthManager
    */
   public async login(): Promise<void> {
-    throw new Error("Direct login is not supported. Use the login function from AuthContext instead.");
+    throw new Error("Direct login is not supported. Use the login function from the specific provider instead.");
   }
 
   /**
@@ -66,7 +58,7 @@ class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager
    * @throws {Error} This method is disabled in ProxyAuthManager
    */
   public async handleRedirect(): Promise<void> {
-    throw new Error("Direct handleRedirect is not supported. Use the handleRedirect function from AuthContext instead.");
+    throw new Error("Direct handleRedirect is not supported. Use the handleRedirect function from the specific provider instead.");
   }
 
   /**
