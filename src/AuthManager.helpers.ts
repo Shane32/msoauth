@@ -18,18 +18,19 @@ export interface TokenResponse {
 export interface TokenInfo {
   /** The version number of this structure */
   version: number;
-  /** The current access token for API requests */
-  apiAccessToken: string;
-  /** The current access token for MS Graph requests */
-  msAccessToken: string;
   /** The refresh token for obtaining new access tokens */
   refreshToken: string;
-  /** Timestamp (in milliseconds) when the API access token expires */
-  apiExpiresAt: number;
-  /** Timestamp (in milliseconds) when the MS Graph access token expires */
-  msExpiresAt: number;
   /** The id token used for user information */
   idToken: string;
+  /** Access tokens for different scope sets */
+  accessTokens: {
+    [scopeSetName: string]: {
+      /** The access token */
+      token: string;
+      /** Timestamp (in milliseconds) when the access token expires */
+      expiresAt: number;
+    };
+  };
 }
 
 /**

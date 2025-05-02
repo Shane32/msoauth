@@ -26,10 +26,10 @@ npm install @shane32/msoauth
    - Required API permissions
    - Enable implicit grant for access tokens
 
-2. Create an AuthManager instance in your `main.tsx` with your Azure AD configuration:
+2. Create an MsAuthManager instance in your `main.tsx` with your Azure AD configuration (recommended for Azure AD as it automatically adds required Microsoft-specific scopes):
 
 ```typescript
-import { AuthManager, Policies } from "@shane32/msoauth";
+import { MsAuthManager, Policies } from "@shane32/msoauth";
 
 // Define your policies
 export enum Policies {
@@ -41,11 +41,11 @@ const policies: Record<keyof typeof Policies, (roles: string[]) => boolean> = {
   [Policies.Admin]: (roles) => roles.indexOf("All.Admin") >= 0,
 };
 
-// Initialize AuthManager
-const authManager = new AuthManager({
+// Initialize MsAuthManager
+const authManager = new MsAuthManager({
   clientId: import.meta.env.VITE_AZURE_CLIENT_ID,
   authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID}/v2.0`,
-  scope: import.meta.env.VITE_AZURE_SCOPES,
+  scopes: import.meta.env.VITE_AZURE_SCOPES,
   redirectUri: "/oauth/callback",
   navigateCallback: (path: string) => {
     // A navigate function that uses the browser's history API
