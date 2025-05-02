@@ -1,10 +1,12 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import {
   extractUserInfo,
+  convertTokenInfoToV2,
   generatePKCECodes,
   generateState,
   getCurrentRelativeUrl,
   TokenInfo,
+  TokenInfoV1,
   TokenResponse,
   UserInfo,
 } from "./AuthManager.helpers";
@@ -142,9 +144,13 @@ class AuthManager<TPolicyNames extends string = string> {
     // Try to load tokens from storage
     const stored = localStorage.getItem(this.tokenKey);
     if (stored) {
-      this.tokenInfo = JSON.parse(stored);
+      const parsedToken = JSON.parse(stored);
+
+      // Convert from version 1 to version 2 if needed
+      this.tokenInfo = convertTokenInfoToV2(parsedToken);
+
       // Initialize userInfo from stored token
-      if (this.tokenInfo && this.tokenInfo.version === 1) {
+      if (this.tokenInfo && this.tokenInfo.version === 2) {
         this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
     }
@@ -411,7 +417,7 @@ class AuthManager<TPolicyNames extends string = string> {
       // Initialize token info if needed
       if (!this.tokenInfo) {
         this.tokenInfo = {
-          version: 1,
+          version: 2,
           refreshToken: currentRefreshToken,
           idToken: "",
           accessTokens: {},

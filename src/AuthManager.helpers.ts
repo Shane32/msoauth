@@ -13,11 +13,31 @@ export interface TokenResponse {
 }
 
 /**
- * Internal representation of token information with expiration
+ * Legacy (version 1) representation of token information with expiration
+ */
+export interface TokenInfoV1 {
+  /** The version number of this structure */
+  version: 1;
+  /** The current access token for API requests */
+  apiAccessToken: string;
+  /** The current access token for MS Graph requests */
+  msAccessToken: string;
+  /** The refresh token for obtaining new access tokens */
+  refreshToken: string;
+  /** Timestamp (in milliseconds) when the API access token expires */
+  apiExpiresAt: number;
+  /** Timestamp (in milliseconds) when the MS Graph access token expires */
+  msExpiresAt: number;
+  /** The id token used for user information */
+  idToken: string;
+}
+
+/**
+ * Internal representation of token information with expiration (version 2)
  */
 export interface TokenInfo {
   /** The version number of this structure */
-  version: number;
+  version: 2;
   /** The refresh token for obtaining new access tokens */
   refreshToken: string;
   /** The id token used for user information */
@@ -155,4 +175,38 @@ export function extractUserInfo(idToken: string): UserInfo {
     oid: decoded.oid,
     roles: decoded.roles ? (Array.isArray(decoded.roles) ? decoded.roles : [decoded.roles]) : [],
   };
+}
+
+/**
+ * Converts a TokenInfo from version 1 to version 2
+ * @param {any} tokenData - The token data to convert
+ * @returns {TokenInfo} The converted token info
+ */
+export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenInfo {
+  // Check if it's the old TokenInfoV1 format with apiAccessToken and msAccessToken
+  if (tokenData.version === 1 && "apiAccessToken" in tokenData && "msAccessToken" in tokenData) {
+    const v1Token = tokenData as TokenInfoV1;
+
+    // Convert to version 2 format
+    return {
+      version: 2,
+      refreshToken: v1Token.refreshToken,
+      idToken: v1Token.idToken,
+      accessTokens: {
+        // Map API token to default scope set
+        default: {
+          token: v1Token.apiAccessToken,
+          expiresAt: v1Token.apiExpiresAt,
+        },
+        // Map MS Graph token to ms scope set
+        ms: {
+          token: v1Token.msAccessToken,
+          expiresAt: v1Token.msExpiresAt,
+        },
+      },
+    };
+  }
+
+  // It's already version 2 or higher
+  return tokenData;
 }
