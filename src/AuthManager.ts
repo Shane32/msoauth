@@ -76,7 +76,7 @@ class AuthManager<TPolicyNames extends string = string> {
   private tokenInfo: TokenInfo | null = null;
   private refreshPromise: Promise<void> | null = null;
   private eventListeners: Map<AuthEventType, Set<AuthEventListener>> = new Map();
-  private configManager: OpenIDConfigurationManager;
+  protected configManager: OpenIDConfigurationManager;
   private readonly absoluteRedirectUri: string;
   private readonly absoluteLogoutRedirectUri: string | undefined;
   private readonly policies: Record<TPolicyNames, PolicyFunction>;
@@ -273,8 +273,6 @@ class AuthManager<TPolicyNames extends string = string> {
     // Clean up state
     localStorage.removeItem(this.stateKey);
 
-    const config = await this.configManager.getConfiguration();
-
     const params = new URLSearchParams({
       grant_type: "authorization_code",
       client_id: this.clientId,
@@ -286,7 +284,7 @@ class AuthManager<TPolicyNames extends string = string> {
     // Clean up verifier
     localStorage.removeItem(this.verifierKey);
 
-    const response = await fetch(config.token_endpoint, {
+    const response = await fetch(await this.getTokenEndpointUrl("authorization_code"), {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -407,7 +405,6 @@ class AuthManager<TPolicyNames extends string = string> {
     }
 
     this.refreshPromise = (async () => {
-      const config = await this.configManager.getConfiguration();
       let currentRefreshToken = refreshToken ?? this.tokenInfo?.refreshToken;
 
       if (!currentRefreshToken) {
@@ -438,7 +435,7 @@ class AuthManager<TPolicyNames extends string = string> {
           scope: scopes,
         });
 
-        const response = await fetch(config.token_endpoint, {
+        const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -520,6 +517,17 @@ class AuthManager<TPolicyNames extends string = string> {
    */
   public can(policy: TPolicyNames): boolean {
     return this.userInfo ? this.policies[policy]?.(this.userInfo.roles) ?? false : false;
+  }
+
+  /**
+   * Gets the token endpoint URL for a specific grant type
+   * @param {string} grantType - The OAuth grant type (e.g., "authorization_code", "refresh_token")
+   * @returns {Promise<string>} The URL to use for token requests
+   * @protected
+   */
+  protected async getTokenEndpointUrl(grantType: string): Promise<string> {
+    const config = await this.configManager.getConfiguration();
+    return config.token_endpoint;
   }
 }
 
