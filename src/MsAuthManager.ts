@@ -14,8 +14,22 @@ class MsAuthManager<TPolicyNames extends string = string> extends AuthManager<TP
     // Add Microsoft-specific scopes to the configuration
     const msConfig = { ...config };
 
+    // Split the scopes by spaces
+    const allScopes = config.scopes.split(" ").filter((scope) => scope.trim() !== "");
+
+    // Filter API scopes (starting with "api://") and non-API scopes
+    const apiScopes = allScopes.filter((scope) => scope.startsWith("api://"));
+    const nonApiScopes = allScopes.filter((scope) => !scope.startsWith("api://"));
+
+    // Update config.scopes to only include API scopes
+    msConfig.scopes = apiScopes.join(" ");
+
     // Create a new scopeSets array with the MS-specific scope set
-    const msScope: ScopeSet = { name: "ms", scopes: "openid profile offline_access" };
+    // Include both standard MS scopes and non-API scopes from config
+    const msScope: ScopeSet = {
+      name: "ms",
+      scopes: ["openid", "profile", "offline_access", ...nonApiScopes].join(" "),
+    };
 
     // Add the MS scope set to the config
     msConfig.scopeSets = msConfig.scopeSets ? [...msConfig.scopeSets, msScope] : [msScope];
