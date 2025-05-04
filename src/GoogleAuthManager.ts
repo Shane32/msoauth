@@ -54,19 +54,20 @@ class GoogleAuthManager<TPolicyNames extends string = string> extends AuthManage
   }
 
   /**
-   * Override generateRedirectParams to include access_type=offline
+   * Override generateLoginParams to include access_type=offline and prompt=consent
    * This ensures Google OAuth will always return a refresh token
-   * @param {string} code - The authorization code from the OAuth provider
-   * @param {string} codeVerifier - The PKCE code verifier
-   * @returns {URLSearchParams} The parameters for the token request
+   * @param {string} codeChallenge - The PKCE code challenge
+   * @param {string} state - The state parameter for CSRF protection
+   * @returns {URLSearchParams} The parameters for the login request
    * @protected
    */
-  protected generateRedirectParams(code: string, codeVerifier: string): URLSearchParams {
+  protected generateLoginParams(codeChallenge: string, state: string): URLSearchParams {
     // Get base params from parent class
-    const params = super.generateRedirectParams(code, codeVerifier);
+    const params = super.generateLoginParams(codeChallenge, state);
 
-    // Add access_type=offline to ensure we get a refresh token
+    // Add access_type=offline and prompt=consent to ensure we get a refresh token
     params.append("access_type", "offline");
+    params.append("prompt", "consent");
 
     return params;
   }
