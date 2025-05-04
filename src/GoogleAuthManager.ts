@@ -1,4 +1,5 @@
 import AuthManager, { AuthManagerConfiguration } from "./AuthManager";
+import { TokenResponse } from "./AuthManager.helpers";
 
 /**
  * Configuration object for GoogleAuthManager
@@ -28,32 +29,17 @@ class GoogleAuthManager<TPolicyNames extends string = string> extends AuthManage
       throw new Error("proxyUrl is required for GoogleAuthManager");
     }
 
-    // Add Google-specific scopes to the configuration
-    const googleConfig = { ...config };
-
-    // Add required Google scopes (openid profile email) to the provided scopes
-    // avoiding duplicates
-    const requiredScopes = ["openid", "profile", "email"];
-    const existingScopes = googleConfig.scopes.split(" ").filter((s) => s.trim() !== "");
-
-    // Add required scopes that don't already exist
-    for (const scope of requiredScopes) {
-      if (!existingScopes.includes(scope)) {
-        existingScopes.push(scope);
-      }
-    }
-
-    // Update the scopes in the config
-    googleConfig.scopes = existingScopes.join(" ");
-
-    // Store proxyUrl for later use
-    const proxyUrl = config.proxyUrl;
+    // Add openid scopes to the configuration
+    const googleConfig = {
+      ...config,
+      scopes: ((config.scopes || "") + " openid profile email").trim(),
+    };
 
     // Call the parent constructor with the updated config
     super(googleConfig);
 
     // Store the proxy URL
-    this.proxyUrl = proxyUrl;
+    this.proxyUrl = config.proxyUrl;
   }
 
   /**
@@ -65,6 +51,44 @@ class GoogleAuthManager<TPolicyNames extends string = string> extends AuthManage
   protected async getTokenEndpointUrl(grantType: string): Promise<string> {
     // Use the proxy URL for all token requests
     return this.proxyUrl;
+  }
+
+  /**
+   * Override generateRedirectParams to include access_type=offline
+   * This ensures Google OAuth will always return a refresh token
+   * @param {string} code - The authorization code from the OAuth provider
+   * @param {string} codeVerifier - The PKCE code verifier
+   * @returns {URLSearchParams} The parameters for the token request
+   * @protected
+   */
+  protected generateRedirectParams(code: string, codeVerifier: string): URLSearchParams {
+    // Get base params from parent class
+    const params = super.generateRedirectParams(code, codeVerifier);
+
+    // Add access_type=offline to ensure we get a refresh token
+    params.append("access_type", "offline");
+
+    return params;
+  }
+
+  /**
+   * Override parseTokenResponse to set access_token to equal id_token
+   * This is useful for Google OAuth where the id_token contains user information
+   * that may be needed for authentication purposes
+   * @param {TokenResponse} response - The raw token response from the OAuth provider
+   * @returns {TokenResponse} The modified token response
+   * @protected
+   */
+  protected parseTokenResponse(response: TokenResponse): TokenResponse {
+    // Create a copy of the response to avoid modifying the original
+    const parsedResponse = { ...response };
+
+    // If id_token exists, set access_token to equal id_token
+    if (parsedResponse.id_token) {
+      parsedResponse.access_token = parsedResponse.id_token;
+    }
+
+    return parsedResponse;
   }
 }
 

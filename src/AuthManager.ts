@@ -273,13 +273,8 @@ class AuthManager<TPolicyNames extends string = string> {
     // Clean up state
     localStorage.removeItem(this.stateKey);
 
-    const params = new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: this.clientId,
-      code_verifier: codeVerifier,
-      code,
-      redirect_uri: this.absoluteRedirectUri,
-    });
+    // Generate params for token request
+    const params = this.generateRedirectParams(code, codeVerifier);
 
     // Clean up verifier
     localStorage.removeItem(this.verifierKey);
@@ -296,7 +291,10 @@ class AuthManager<TPolicyNames extends string = string> {
       throw new Error("Failed to get tokens");
     }
 
-    const data: TokenResponse = await response.json();
+    const rawData = await response.json();
+
+    // Parse the token response
+    const data = this.parseTokenResponse(rawData);
 
     // Set initial tokens and immediately refresh them
     await this.refreshTokens(data.refresh_token);
@@ -394,7 +392,9 @@ class AuthManager<TPolicyNames extends string = string> {
   }
 
   /**
-   * Refreshes all access tokens using the refresh token
+   * Refreshes all access tokens using the refresh token,
+   * allowing simultaneous calls to avoid multiple refreshes.
+   * A single call to refreshTokensInternal will be made, if needed.
    * @param {string} [refreshToken] - Optional refresh token to use
    * @throws {Error} If token refresh fails
    */
@@ -404,89 +404,99 @@ class AuthManager<TPolicyNames extends string = string> {
       return;
     }
 
-    this.refreshPromise = (async () => {
-      let currentRefreshToken = refreshToken ?? this.tokenInfo?.refreshToken;
-
-      if (!currentRefreshToken) {
-        throw new Error("No refresh token available");
-      }
-
-      // Initialize token info if needed
-      if (!this.tokenInfo) {
-        this.tokenInfo = {
-          version: 2,
-          refreshToken: currentRefreshToken,
-          idToken: "",
-          accessTokens: {},
-        };
-      }
-
-      // Refresh tokens for all scope sets
-      const scopeEntries = Array.from(this.scopeSets.entries());
-      for (let i = 0; i < scopeEntries.length; i++) {
-        const [scopeSetName, scopes] = scopeEntries[i];
-
-        if (!scopes || scopes.trim() === "") continue;
-
-        const params = new URLSearchParams({
-          grant_type: "refresh_token",
-          client_id: this.clientId,
-          refresh_token: currentRefreshToken,
-          scope: scopes,
-        });
-
-        const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
-        });
-
-        if (!response.ok) {
-          this.localLogout();
-          throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
-        }
-
-        const data: TokenResponse = await response.json();
-
-        // Update the refresh token for subsequent requests
-        currentRefreshToken = data.refresh_token;
-
-        // Update the token info
-        if (!this.tokenInfo.accessTokens) {
-          this.tokenInfo.accessTokens = {};
-        }
-
-        this.tokenInfo.accessTokens[scopeSetName] = {
-          token: data.access_token,
-          expiresAt: Date.now() + data.expires_in * 1000,
-        };
-
-        // Update ID token if present
-        if (data.id_token) {
-          this.tokenInfo.idToken = data.id_token;
-        }
-      }
-
-      // Update the refresh token with the latest one
-      this.tokenInfo.refreshToken = currentRefreshToken;
-
-      // Update user info from ID token
-      if (this.tokenInfo.idToken) {
-        this.userInfo = extractUserInfo(this.tokenInfo.idToken);
-      }
-
-      // Save tokens to local storage
-      localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
-      this.emitEvent("tokensChanged");
-    })();
+    this.refreshPromise = this.refreshTokensInternal(refreshToken);
 
     try {
       await this.refreshPromise;
     } finally {
       this.refreshPromise = null;
     }
+  }
+
+  /**
+   * Refreshes all access tokens using the refresh token
+   * @param {string} [refreshToken] - Optional refresh token to use
+   * @throws {Error} If token refresh fails
+   */
+  protected async refreshTokensInternal(refreshToken?: string): Promise<void> {
+    let currentRefreshToken = refreshToken ?? this.tokenInfo?.refreshToken;
+
+    if (!currentRefreshToken) {
+      throw new Error("No refresh token available");
+    }
+
+    // Initialize token info if needed
+    if (!this.tokenInfo) {
+      this.tokenInfo = {
+        version: 2,
+        refreshToken: currentRefreshToken,
+        idToken: "",
+        accessTokens: {},
+      };
+    }
+
+    // Refresh tokens for all scope sets
+    const scopeEntries = Array.from(this.scopeSets.entries());
+    for (let i = 0; i < scopeEntries.length; i++) {
+      const [scopeSetName, scopes] = scopeEntries[i];
+
+      if (!scopes || scopes.trim() === "") continue;
+
+      const params = new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: this.clientId,
+        refresh_token: currentRefreshToken,
+        scope: scopes,
+      });
+
+      const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      });
+
+      if (!response.ok) {
+        this.localLogout();
+        throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
+      }
+
+      const rawData = await response.json();
+
+      // Parse the token response
+      const data = this.parseTokenResponse(rawData);
+
+      // Update the refresh token for subsequent requests
+      currentRefreshToken = data.refresh_token;
+
+      // Update the token info
+      if (!this.tokenInfo.accessTokens) {
+        this.tokenInfo.accessTokens = {};
+      }
+
+      this.tokenInfo.accessTokens[scopeSetName] = {
+        token: data.access_token,
+        expiresAt: Date.now() + data.expires_in * 1000,
+      };
+
+      // Update ID token if present
+      if (data.id_token) {
+        this.tokenInfo.idToken = data.id_token;
+      }
+    }
+
+    // Update the refresh token with the latest one
+    this.tokenInfo.refreshToken = currentRefreshToken;
+
+    // Update user info from ID token
+    if (this.tokenInfo.idToken) {
+      this.userInfo = extractUserInfo(this.tokenInfo.idToken);
+    }
+
+    // Save tokens to local storage
+    localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
+    this.emitEvent("tokensChanged");
   }
 
   /**
@@ -528,6 +538,34 @@ class AuthManager<TPolicyNames extends string = string> {
   protected async getTokenEndpointUrl(grantType: string): Promise<string> {
     const config = await this.configManager.getConfiguration();
     return config.token_endpoint;
+  }
+
+  /**
+   * Generates the parameters for the token request during redirect handling
+   * @param {string} code - The authorization code from the OAuth provider
+   * @param {string} codeVerifier - The PKCE code verifier
+   * @returns {URLSearchParams} The parameters for the token request
+   * @protected
+   */
+  protected generateRedirectParams(code: string, codeVerifier: string): URLSearchParams {
+    return new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: this.clientId,
+      code_verifier: codeVerifier,
+      code,
+      redirect_uri: this.absoluteRedirectUri,
+    });
+  }
+
+  /**
+   * Parses the token response from the OAuth provider
+   * @param {TokenResponse} response - The raw token response from the OAuth provider
+   * @returns {TokenResponse} The parsed token response
+   * @protected
+   */
+  protected parseTokenResponse(response: TokenResponse): TokenResponse {
+    // By default, just return the response as-is
+    return response;
   }
 }
 
