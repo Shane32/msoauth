@@ -259,7 +259,9 @@ class AuthManager<TPolicyNames extends string = string> {
 
   /**
    * Handles the OAuth redirect callback
-   * Exchanges the authorization code for tokens and immediately refreshes them
+   * Exchanges the authorization code for tokens
+   * If multiple scope sets exist, immediately refreshes tokens to get tokens for all scope sets
+   * If only one scope set exists, uses the returned tokens directly
    * @throws {Error} If authorization code is missing or invalid
    */
   public async handleRedirect(): Promise<void> {
@@ -308,8 +310,33 @@ class AuthManager<TPolicyNames extends string = string> {
     // Parse the token response
     const data = this.parseTokenResponse(rawData);
 
-    // Set initial tokens and immediately refresh them
-    await this.refreshTokens(data.refresh_token);
+    if (this.scopeSets.size === 1) {
+      // If only one scope set exists, use the returned tokens directly
+      this.tokenInfo = {
+        version: 2,
+        refreshToken: data.refresh_token,
+        idToken: data.id_token || "",
+        accessTokens: {
+          default: {
+            token: data.access_token,
+            expiresAt: Date.now() + data.expires_in * 1000,
+          },
+        },
+      };
+
+      // Update user info from ID token
+      if (data.id_token) {
+        this.userInfo = extractUserInfo(data.id_token);
+      }
+
+      // Save tokens to local storage
+      localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
+      this.emitEvent("tokensChanged");
+    } else {
+      // If multiple scope sets exist, refresh tokens to get tokens for all scope sets
+      await this.refreshTokens(data.refresh_token);
+    }
+
     this.emitEvent("login");
 
     // Restore original URL if it exists
