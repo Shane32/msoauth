@@ -79,8 +79,10 @@ export interface UserInfo {
 interface JwtPayload {
   /** Expiration time of the token (Unix timestamp) */
   exp: number;
-  /** Object ID (unique identifier) of the user */
+  /** Azure Object ID (unique identifier) of the user */
   oid?: string;
+  /** Subject of the user */
+  sub: string;
   /** Array of roles assigned to the user */
   roles?: string[] | string;
   /** Additional custom claims in the JWT */
@@ -168,11 +170,11 @@ export function getCurrentRelativeUrl() {
  */
 export function extractUserInfo(idToken: string): UserInfo {
   const decoded = jwtDecode(idToken);
-  if (!decoded.oid) throw new Error("Object ID not found in token");
+  if (!decoded.oid && !decoded.sub) throw new Error("Both Object ID and Subject not found in token");
 
   return {
     ...decoded,
-    oid: decoded.oid,
+    oid: decoded.oid || decoded.sub,
     roles: decoded.roles ? (Array.isArray(decoded.roles) ? decoded.roles : [decoded.roles]) : [],
   };
 }
