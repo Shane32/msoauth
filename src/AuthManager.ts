@@ -232,17 +232,29 @@ class AuthManager<TPolicyNames extends string = string> {
     const state = generateState();
     localStorage.setItem(this.stateKey, state);
 
-    const params = new URLSearchParams({
+    // Generate login parameters
+    const params = this.generateLoginParams(pkce.codeChallenge, state);
+
+    window.location.href = `${config.authorization_endpoint}?${params.toString()}`;
+  }
+
+  /**
+   * Generates the parameters for the login request
+   * @param {string} codeChallenge - The PKCE code challenge
+   * @param {string} state - The state parameter for CSRF protection
+   * @returns {URLSearchParams} The parameters for the login request
+   * @protected
+   */
+  protected generateLoginParams(codeChallenge: string, state: string): URLSearchParams {
+    return new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.absoluteRedirectUri,
       response_type: "code",
       scope: this.allScopes,
       state,
       code_challenge_method: "S256",
-      code_challenge: pkce.codeChallenge,
+      code_challenge: codeChallenge,
     });
-
-    window.location.href = `${config.authorization_endpoint}?${params.toString()}`;
   }
 
   /**
