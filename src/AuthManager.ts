@@ -510,8 +510,11 @@ class AuthManager<TPolicyNames extends string = string> {
         // Parse the token response
         const data = this.parseTokenResponse(rawData);
 
-        // Update the refresh token for subsequent requests
-        currentRefreshToken = data.refresh_token;
+        // Update the refresh token for subsequent requests only if a new one is provided
+        // This preserves the existing token if the provider doesn't rotate refresh tokens
+        if (!!data.refresh_token) {
+          currentRefreshToken = data.refresh_token;
+        }
 
         // Update the token info
         if (!this.tokenInfo.accessTokens) {
