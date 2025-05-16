@@ -207,10 +207,10 @@ class AuthManager<TPolicyNames extends string = string> {
 
   /**
    * Checks if the user is currently authenticated
-   * @returns {boolean} True if user has valid tokens
+   * @returns {boolean} True if user has valid refresh tokens
    */
   public isAuthenticated(): boolean {
-    return this.tokenInfo !== null && !this.isTokenExpired();
+    return this.tokenInfo !== null && this.tokenInfo.refreshToken !== undefined && this.tokenInfo.refreshToken !== "";
   }
 
   /**
@@ -393,6 +393,9 @@ class AuthManager<TPolicyNames extends string = string> {
    * Performs local logout by clearing tokens and cache
    */
   private localLogout(): void {
+    if (!this.tokenInfo && !this.userInfo) {
+      return;
+    }
     this.tokenInfo = null;
     this.userInfo = null;
     this.configManager.clearCache();
@@ -461,6 +464,7 @@ class AuthManager<TPolicyNames extends string = string> {
     let currentRefreshToken = refreshToken ?? this.tokenInfo?.refreshToken;
 
     if (!currentRefreshToken) {
+      this.localLogout();
       throw new Error("No refresh token available");
     }
 
@@ -474,68 +478,73 @@ class AuthManager<TPolicyNames extends string = string> {
       };
     }
 
-    // Refresh tokens for all scope sets
-    const scopeEntries = Array.from(this.scopeSets.entries());
-    for (let i = 0; i < scopeEntries.length; i++) {
-      const [scopeSetName, scopes] = scopeEntries[i];
+    try {
+      // Refresh tokens for all scope sets
+      const scopeEntries = Array.from(this.scopeSets.entries());
+      for (let i = 0; i < scopeEntries.length; i++) {
+        const [scopeSetName, scopes] = scopeEntries[i];
 
-      if (!scopes || scopes.trim() === "") continue;
+        if (!scopes || scopes.trim() === "") continue;
 
-      const params = new URLSearchParams({
-        grant_type: "refresh_token",
-        client_id: this.clientId,
-        refresh_token: currentRefreshToken,
-        scope: scopes,
-      });
+        const params = new URLSearchParams({
+          grant_type: "refresh_token",
+          client_id: this.clientId,
+          refresh_token: currentRefreshToken,
+          scope: scopes,
+        });
 
-      const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: params.toString(),
-      });
+        const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: params.toString(),
+        });
 
-      if (!response.ok) {
-        this.localLogout();
-        throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
+        if (!response.ok) {
+          throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
+        }
+
+        const rawData = await response.json();
+
+        // Parse the token response
+        const data = this.parseTokenResponse(rawData);
+
+        // Update the refresh token for subsequent requests
+        currentRefreshToken = data.refresh_token;
+
+        // Update the token info
+        if (!this.tokenInfo.accessTokens) {
+          this.tokenInfo.accessTokens = {};
+        }
+
+        this.tokenInfo.accessTokens[scopeSetName] = {
+          token: data.access_token,
+          expiresAt: Date.now() + data.expires_in * 1000,
+        };
+
+        // Update ID token if present
+        if (data.id_token) {
+          this.tokenInfo.idToken = data.id_token;
+        }
       }
 
-      const rawData = await response.json();
+      // Update the refresh token with the latest one
+      this.tokenInfo.refreshToken = currentRefreshToken;
 
-      // Parse the token response
-      const data = this.parseTokenResponse(rawData);
-
-      // Update the refresh token for subsequent requests
-      currentRefreshToken = data.refresh_token;
-
-      // Update the token info
-      if (!this.tokenInfo.accessTokens) {
-        this.tokenInfo.accessTokens = {};
+      // Update user info from ID token
+      if (this.tokenInfo.idToken) {
+        this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
 
-      this.tokenInfo.accessTokens[scopeSetName] = {
-        token: data.access_token,
-        expiresAt: Date.now() + data.expires_in * 1000,
-      };
-
-      // Update ID token if present
-      if (data.id_token) {
-        this.tokenInfo.idToken = data.id_token;
-      }
+      // Save tokens to local storage
+      localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
+      this.emitEvent("tokensChanged");
+    } catch (error) {
+      // If any part of the refresh process fails, log out and rethrow
+      this.localLogout();
+      throw error;
     }
-
-    // Update the refresh token with the latest one
-    this.tokenInfo.refreshToken = currentRefreshToken;
-
-    // Update user info from ID token
-    if (this.tokenInfo.idToken) {
-      this.userInfo = extractUserInfo(this.tokenInfo.idToken);
-    }
-
-    // Save tokens to local storage
-    localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
-    this.emitEvent("tokensChanged");
   }
 
   /**
