@@ -15,6 +15,6 @@ export { default as GoogleAuthManager, GoogleAuthManagerConfiguration } from "./
 export { default as ProxyAuthManager } from "./ProxyAuthManager";
 export { default as AuthManagersContext } from "./AuthManagersContext";
 export { default as useAuth } from "./useAuth";
-export { UserInfo } from "./AuthManager.helpers";
+export { UserInfo, TokenResponse } from "./AuthManager.helpers";
 export { default as AuthenticatedTemplate } from "./AuthenticatedTemplate";
 export { default as UnauthenticatedTemplate } from "./UnauthenticatedTemplate";
