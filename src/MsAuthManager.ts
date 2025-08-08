@@ -6,6 +6,8 @@ import AuthManager, { AuthManagerConfiguration, ScopeSet } from "./AuthManager";
  * @template TPolicyNames - Enum type for policy keys
  */
 class MsAuthManager<TPolicyNames extends string = string> extends AuthManager<TPolicyNames> {
+  private hasApiScopes: boolean;
+
   /**
    * Creates a new instance of MsAuthManager
    * @param {AuthManagerConfiguration} config - Configuration object for the MsAuthManager
@@ -36,6 +38,28 @@ class MsAuthManager<TPolicyNames extends string = string> extends AuthManager<TP
 
     // Call the parent constructor with the updated config
     super(msConfig);
+
+    // Track whether we have API scopes
+    this.hasApiScopes = apiScopes.length > 0;
+  }
+
+  /**
+   * Gets a valid access token for the specified scope set
+   * If no API scopes were configured and requesting the default scope set,
+   * returns the ID token instead of the access token
+   * @param {string} [scopeSetName="default"] - The name of the scope set to get the token for
+   * @returns {Promise<string>} A valid access token or ID token
+   * @throws {Error} If not authenticated, token refresh fails, or scope set doesn't exist
+   */
+  public async getAccessToken(scopeSetName: string = "default"): Promise<string> {
+    // If no API scopes were configured and requesting default scope set,
+    // return the ID token instead
+    if (!this.hasApiScopes && scopeSetName === "default") {
+      return this.getIdToken();
+    }
+
+    // Otherwise, use the parent implementation
+    return super.getAccessToken(scopeSetName);
   }
 }
 
