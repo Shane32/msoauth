@@ -19,7 +19,7 @@ export type AuthEventListener = () => void;
 /** Callback function type for navigation */
 export type NavigateCallback = (
   /** The relative path to navigate to (must start with '/') */
-  path: string
+  path: string,
 ) => void;
 /** Type for policy functions that evaluate user roles */
 export type PolicyFunction = (roles: string[]) => boolean;
@@ -598,7 +598,7 @@ class AuthManager<TPolicyNames extends string = string> {
    * @returns {boolean} True if user has the specified policy permission
    */
   public can(policy: TPolicyNames): boolean {
-    return this.userInfo ? this.policies[policy]?.(this.userInfo.roles) ?? false : false;
+    return this.userInfo ? (this.policies[policy]?.(this.userInfo.roles) ?? false) : false;
   }
 
   /**

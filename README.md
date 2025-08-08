@@ -20,7 +20,6 @@ npm install @shane32/msoauth
 ## Setup
 
 1. Register your application in the Azure Portal and configure the following:
-
    - Redirect URI (e.g., `https://localhost:12345/oauth/callback`)
    - Logout URI (e.g., `https://localhost:12345/oauth/logout`)
    - Required API permissions
