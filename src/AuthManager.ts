@@ -434,6 +434,27 @@ class AuthManager<TPolicyNames extends string = string> {
   }
 
   /**
+   * Gets a valid ID token, refreshing if necessary
+   * @returns {Promise<string>} A valid ID token
+   * @throws {Error} If not authenticated or token refresh fails
+   */
+  public async getIdToken(): Promise<string> {
+    if (!this.tokenInfo) {
+      throw new Error("Not authenticated");
+    }
+
+    if (this.isTokenExpired()) {
+      await this.refreshTokens();
+    }
+
+    if (!this.tokenInfo.idToken) {
+      throw new Error("No ID token available");
+    }
+
+    return this.tokenInfo.idToken;
+  }
+
+  /**
    * Refreshes all access tokens using the refresh token,
    * allowing simultaneous calls to avoid multiple refreshes.
    * A single call to refreshTokensInternal will be made, if needed.
