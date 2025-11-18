@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import {
   extractUserInfo,
+  extractTokenExpiration,
   convertTokenInfoToV2,
   generatePKCECodes,
   generateState,
@@ -316,6 +317,7 @@ class AuthManager<TPolicyNames extends string = string> {
         version: 2,
         refreshToken: data.refresh_token,
         idToken: data.id_token || "",
+        idTokenExpiresAt: data.id_token ? extractTokenExpiration(data.id_token) : 0,
         accessTokens: {
           default: {
             token: data.access_token,
@@ -443,7 +445,7 @@ class AuthManager<TPolicyNames extends string = string> {
       throw new Error("Not authenticated");
     }
 
-    if (this.isTokenExpired()) {
+    if (this.isIdTokenExpired()) {
       await this.refreshTokens();
     }
 
@@ -495,6 +497,7 @@ class AuthManager<TPolicyNames extends string = string> {
         version: 2,
         refreshToken: currentRefreshToken,
         idToken: "",
+        idTokenExpiresAt: 0,
         accessTokens: {},
       };
     }
@@ -547,9 +550,10 @@ class AuthManager<TPolicyNames extends string = string> {
           expiresAt: Date.now() + data.expires_in * 1000,
         };
 
-        // Update ID token if present
+        // Update ID token and its expiration if present
         if (data.id_token) {
           this.tokenInfo.idToken = data.id_token;
+          this.tokenInfo.idTokenExpiresAt = extractTokenExpiration(data.id_token);
         }
       }
 
@@ -590,6 +594,19 @@ class AuthManager<TPolicyNames extends string = string> {
     }
 
     return false;
+  }
+
+  /**
+   * Checks if the ID token is expired
+   * @returns {boolean} True if ID token is expired or close to expiring
+   */
+  private isIdTokenExpired(): boolean {
+    if (!this.tokenInfo || !this.tokenInfo.idTokenExpiresAt) return true;
+
+    const now = Date.now();
+    const expirationBuffer = 5 * 60 * 1000; // 5 minutes
+
+    return this.tokenInfo.idTokenExpiresAt - now < expirationBuffer;
   }
 
   /**

@@ -42,6 +42,8 @@ export interface TokenInfo {
   refreshToken: string;
   /** The id token used for user information */
   idToken: string;
+  /** Timestamp (in milliseconds) when the ID token expires */
+  idTokenExpiresAt: number;
   /** Access tokens for different scope sets */
   accessTokens: {
     [scopeSetName: string]: {
@@ -180,6 +182,21 @@ export function extractUserInfo(idToken: string): UserInfo {
 }
 
 /**
+ * Extracts the expiration timestamp from a JWT token
+ * @param {string} token - The JWT token to decode
+ * @returns {number} The expiration timestamp in milliseconds
+ * @throws {Error} If the token doesn't contain an expiration claim
+ */
+export function extractTokenExpiration(token: string): number {
+  const decoded = jwtDecode(token);
+  if (!decoded.exp) {
+    return 0;
+  }
+  // Convert from seconds to milliseconds
+  return decoded.exp * 1000;
+}
+
+/**
  * Converts a TokenInfo from version 1 to version 2
  * @param {any} tokenData - The token data to convert
  * @returns {TokenInfo} The converted token info
@@ -194,6 +211,7 @@ export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenI
       version: 2,
       refreshToken: v1Token.refreshToken,
       idToken: v1Token.idToken,
+      idTokenExpiresAt: v1Token.idToken ? extractTokenExpiration(v1Token.idToken) : 0,
       accessTokens: {
         // Map API token to default scope set
         default: {
@@ -209,6 +227,13 @@ export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenI
     };
   }
 
-  // It's already version 2 or higher
+  // It's already version 2 or higher, but may need to add idTokenExpiresAt if missing
+  if (tokenData.version === 2 && tokenData.idToken && !tokenData.idTokenExpiresAt) {
+    return {
+      ...tokenData,
+      idTokenExpiresAt: extractTokenExpiration(tokenData.idToken),
+    };
+  }
+
   return tokenData;
 }
