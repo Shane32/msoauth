@@ -190,15 +190,18 @@ export function extractUserInfo(idToken: string): UserInfo {
 }
 
 /**
- * Extracts the expiration timestamp from a JWT token
+ * Extracts the expiration timestamp from a JWT token.
  * @param {string} token - The JWT token to decode
- * @returns {number} The expiration timestamp in milliseconds
+ * @returns {number} The expiration timestamp in milliseconds since Unix epoch
  * @throws {Error} If the token doesn't contain an expiration claim
  */
 export function extractTokenExpiration(token: string): number {
+  if (!token) {
+    throw new Error("Token is empty");
+  }
   const decoded = jwtDecode(token);
   if (!decoded.exp) {
-    return 0;
+    throw new Error("Token does not contain expiration claim");
   }
   // Convert from seconds to milliseconds
   return decoded.exp * 1000;
