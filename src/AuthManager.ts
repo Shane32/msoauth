@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import {
   extractUserInfo,
-  convertTokenInfoToV2,
+  extractTokenExpiration,
+  convertTokenInfoToV3,
   generatePKCECodes,
   generateState,
   getCurrentRelativeUrl,
@@ -146,11 +147,11 @@ class AuthManager<TPolicyNames extends string = string> {
     if (stored) {
       const parsedToken = JSON.parse(stored);
 
-      // Convert from version 1 to version 2 if needed
-      this.tokenInfo = convertTokenInfoToV2(parsedToken);
+      // Convert from older versions to version 3 if needed
+      this.tokenInfo = convertTokenInfoToV3(parsedToken);
 
       // Initialize userInfo from stored token
-      if (this.tokenInfo && this.tokenInfo.version === 2) {
+      if (this.tokenInfo && this.tokenInfo.version === 3) {
         this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
     }
@@ -313,9 +314,10 @@ class AuthManager<TPolicyNames extends string = string> {
     if (this.scopeSets.size === 1) {
       // If only one scope set exists, use the returned tokens directly
       this.tokenInfo = {
-        version: 2,
+        version: 3,
         refreshToken: data.refresh_token,
         idToken: data.id_token || "",
+        idTokenExpiresAt: data.id_token ? extractTokenExpiration(data.id_token) : 0,
         accessTokens: {
           default: {
             token: data.access_token,
@@ -443,7 +445,7 @@ class AuthManager<TPolicyNames extends string = string> {
       throw new Error("Not authenticated");
     }
 
-    if (this.isTokenExpired()) {
+    if (this.isIdTokenExpired()) {
       await this.refreshTokens();
     }
 
@@ -492,9 +494,10 @@ class AuthManager<TPolicyNames extends string = string> {
     // Initialize token info if needed
     if (!this.tokenInfo) {
       this.tokenInfo = {
-        version: 2,
+        version: 3,
         refreshToken: currentRefreshToken,
         idToken: "",
+        idTokenExpiresAt: 0,
         accessTokens: {},
       };
     }
@@ -547,9 +550,10 @@ class AuthManager<TPolicyNames extends string = string> {
           expiresAt: Date.now() + data.expires_in * 1000,
         };
 
-        // Update ID token if present
+        // Update ID token and its expiration if present
         if (data.id_token) {
           this.tokenInfo.idToken = data.id_token;
+          this.tokenInfo.idTokenExpiresAt = extractTokenExpiration(data.id_token);
         }
       }
 
@@ -590,6 +594,19 @@ class AuthManager<TPolicyNames extends string = string> {
     }
 
     return false;
+  }
+
+  /**
+   * Checks if the ID token is expired
+   * @returns {boolean} True if ID token is expired or close to expiring
+   */
+  private isIdTokenExpired(): boolean {
+    if (!this.tokenInfo || !this.tokenInfo.idTokenExpiresAt) return true;
+
+    const now = Date.now();
+    const expirationBuffer = 5 * 60 * 1000; // 5 minutes
+
+    return this.tokenInfo.idTokenExpiresAt - now < expirationBuffer;
   }
 
   /**

@@ -33,9 +33,9 @@ export interface TokenInfoV1 {
 }
 
 /**
- * Internal representation of token information with expiration (version 2)
+ * Version 2 representation of token information with expiration
  */
-export interface TokenInfo {
+export interface TokenInfoV2 {
   /** The version number of this structure */
   version: 2;
   /** The refresh token for obtaining new access tokens */
@@ -51,6 +51,16 @@ export interface TokenInfo {
       expiresAt: number;
     };
   };
+}
+
+/**
+ * Current representation of token information with expiration (version 3)
+ */
+export interface TokenInfo extends Omit<TokenInfoV2, "version"> {
+  /** The version number of this structure */
+  version: 3;
+  /** Timestamp (in milliseconds) when the ID token expires */
+  idTokenExpiresAt: number;
 }
 
 /**
@@ -180,20 +190,39 @@ export function extractUserInfo(idToken: string): UserInfo {
 }
 
 /**
- * Converts a TokenInfo from version 1 to version 2
+ * Extracts the expiration timestamp from a JWT token.
+ * @param {string} token - The JWT token to decode
+ * @returns {number} The expiration timestamp in milliseconds since Unix epoch
+ * @throws {Error} If the token doesn't contain an expiration claim
+ */
+export function extractTokenExpiration(token: string): number {
+  if (!token) {
+    throw new Error("Token is empty");
+  }
+  const decoded = jwtDecode(token);
+  if (!decoded.exp) {
+    throw new Error("Token does not contain expiration claim");
+  }
+  // Convert from seconds to milliseconds
+  return decoded.exp * 1000;
+}
+
+/**
+ * Converts a TokenInfo from older versions to version 3
  * @param {any} tokenData - The token data to convert
  * @returns {TokenInfo} The converted token info
  */
-export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenInfo {
+export function convertTokenInfoToV3(tokenData: TokenInfo | TokenInfoV2 | TokenInfoV1): TokenInfo {
   // Check if it's the old TokenInfoV1 format with apiAccessToken and msAccessToken
   if (tokenData.version === 1 && "apiAccessToken" in tokenData && "msAccessToken" in tokenData) {
     const v1Token = tokenData as TokenInfoV1;
 
-    // Convert to version 2 format
+    // Convert to version 3 format
     return {
-      version: 2,
+      version: 3,
       refreshToken: v1Token.refreshToken,
       idToken: v1Token.idToken,
+      idTokenExpiresAt: v1Token.idToken ? extractTokenExpiration(v1Token.idToken) : 0,
       accessTokens: {
         // Map API token to default scope set
         default: {
@@ -209,6 +238,15 @@ export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenI
     };
   }
 
-  // It's already version 2 or higher
+  // Check if it's version 2 format (missing idTokenExpiresAt)
+  if (tokenData.version === 2) {
+    return {
+      ...tokenData,
+      version: 3,
+      idTokenExpiresAt: tokenData.idToken ? extractTokenExpiration(tokenData.idToken) : 0,
+    };
+  }
+
+  // It's already version 3
   return tokenData;
 }
