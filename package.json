@@ -52,7 +52,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^18.19.129",
+    "@types/node": "^18.19.130",
     "@types/pretty": "^2.0.3",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
