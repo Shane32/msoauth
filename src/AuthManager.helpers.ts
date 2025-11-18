@@ -33,17 +33,15 @@ export interface TokenInfoV1 {
 }
 
 /**
- * Internal representation of token information with expiration (version 2)
+ * Version 2 representation of token information with expiration
  */
-export interface TokenInfo {
+export interface TokenInfoV2 {
   /** The version number of this structure */
   version: 2;
   /** The refresh token for obtaining new access tokens */
   refreshToken: string;
   /** The id token used for user information */
   idToken: string;
-  /** Timestamp (in milliseconds) when the ID token expires */
-  idTokenExpiresAt: number;
   /** Access tokens for different scope sets */
   accessTokens: {
     [scopeSetName: string]: {
@@ -53,6 +51,16 @@ export interface TokenInfo {
       expiresAt: number;
     };
   };
+}
+
+/**
+ * Current representation of token information with expiration (version 3)
+ */
+export interface TokenInfo extends Omit<TokenInfoV2, "version"> {
+  /** The version number of this structure */
+  version: 3;
+  /** Timestamp (in milliseconds) when the ID token expires */
+  idTokenExpiresAt: number;
 }
 
 /**
@@ -197,18 +205,18 @@ export function extractTokenExpiration(token: string): number {
 }
 
 /**
- * Converts a TokenInfo from version 1 to version 2
+ * Converts a TokenInfo from older versions to version 3
  * @param {any} tokenData - The token data to convert
  * @returns {TokenInfo} The converted token info
  */
-export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenInfo {
+export function convertTokenInfoToV3(tokenData: TokenInfo | TokenInfoV2 | TokenInfoV1): TokenInfo {
   // Check if it's the old TokenInfoV1 format with apiAccessToken and msAccessToken
   if (tokenData.version === 1 && "apiAccessToken" in tokenData && "msAccessToken" in tokenData) {
     const v1Token = tokenData as TokenInfoV1;
 
-    // Convert to version 2 format
+    // Convert to version 3 format
     return {
-      version: 2,
+      version: 3,
       refreshToken: v1Token.refreshToken,
       idToken: v1Token.idToken,
       idTokenExpiresAt: v1Token.idToken ? extractTokenExpiration(v1Token.idToken) : 0,
@@ -227,13 +235,15 @@ export function convertTokenInfoToV2(tokenData: TokenInfo | TokenInfoV1): TokenI
     };
   }
 
-  // It's already version 2 or higher, but may need to add idTokenExpiresAt if missing
-  if (tokenData.version === 2 && tokenData.idToken && !tokenData.idTokenExpiresAt) {
+  // Check if it's version 2 format (missing idTokenExpiresAt)
+  if (tokenData.version === 2) {
     return {
       ...tokenData,
-      idTokenExpiresAt: extractTokenExpiration(tokenData.idToken),
+      version: 3,
+      idTokenExpiresAt: tokenData.idToken ? extractTokenExpiration(tokenData.idToken) : 0,
     };
   }
 
+  // It's already version 3
   return tokenData;
 }

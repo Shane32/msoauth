@@ -2,7 +2,7 @@
 import {
   extractUserInfo,
   extractTokenExpiration,
-  convertTokenInfoToV2,
+  convertTokenInfoToV3,
   generatePKCECodes,
   generateState,
   getCurrentRelativeUrl,
@@ -147,11 +147,11 @@ class AuthManager<TPolicyNames extends string = string> {
     if (stored) {
       const parsedToken = JSON.parse(stored);
 
-      // Convert from version 1 to version 2 if needed
-      this.tokenInfo = convertTokenInfoToV2(parsedToken);
+      // Convert from older versions to version 3 if needed
+      this.tokenInfo = convertTokenInfoToV3(parsedToken);
 
       // Initialize userInfo from stored token
-      if (this.tokenInfo && this.tokenInfo.version === 2) {
+      if (this.tokenInfo && this.tokenInfo.version === 3) {
         this.userInfo = extractUserInfo(this.tokenInfo.idToken);
       }
     }
@@ -314,7 +314,7 @@ class AuthManager<TPolicyNames extends string = string> {
     if (this.scopeSets.size === 1) {
       // If only one scope set exists, use the returned tokens directly
       this.tokenInfo = {
-        version: 2,
+        version: 3,
         refreshToken: data.refresh_token,
         idToken: data.id_token || "",
         idTokenExpiresAt: data.id_token ? extractTokenExpiration(data.id_token) : 0,
@@ -494,7 +494,7 @@ class AuthManager<TPolicyNames extends string = string> {
     // Initialize token info if needed
     if (!this.tokenInfo) {
       this.tokenInfo = {
-        version: 2,
+        version: 3,
         refreshToken: currentRefreshToken,
         idToken: "",
         idTokenExpiresAt: 0,
