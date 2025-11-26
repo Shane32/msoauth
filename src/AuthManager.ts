@@ -503,6 +503,7 @@ class AuthManager<TPolicyNames extends string = string> {
       };
     }
 
+    // Create a copy of the current token info
     const newTokenInfo = {
       ...this.tokenInfo,
       accessTokens: { ...this.tokenInfo.accessTokens },
