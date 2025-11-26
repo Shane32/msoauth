@@ -19,7 +19,7 @@ function useAuth<TPolicyNames extends string = string>(providerId?: string): Aut
 
   // If no provider ID is specified, return the active provider from AuthContext
   if (!providerId) {
-    return authContext as AuthManager<TPolicyNames>;
+    return authContext.authManager as AuthManager<TPolicyNames>;
   }
 
   // If a provider ID is specified, get it from the AuthManagersContext
