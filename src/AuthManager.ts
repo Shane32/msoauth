@@ -487,6 +487,7 @@ class AuthManager<TPolicyNames extends string = string> {
     let currentRefreshToken = refreshToken ?? this.tokenInfo?.refreshToken;
 
     if (!currentRefreshToken) {
+      console.warn("No refresh token available during token refresh; logging out");
       this.localLogout();
       throw new Error("No refresh token available");
     }
@@ -502,77 +503,84 @@ class AuthManager<TPolicyNames extends string = string> {
       };
     }
 
-    try {
-      // Refresh tokens for all scope sets
-      const scopeEntries = Array.from(this.scopeSets.entries());
-      for (let i = 0; i < scopeEntries.length; i++) {
-        const [scopeSetName, scopes] = scopeEntries[i];
+    const newTokenInfo = { ...this.tokenInfo };
 
-        if (!scopes || scopes.trim() === "") continue;
+    // Refresh tokens for all scope sets
+    // Note: if refresh fails, we do not log out the user automatically; just throw an error
+    //   since it could be a temporary connectivity issue
+    const scopeEntries = Array.from(this.scopeSets.entries());
+    for (let i = 0; i < scopeEntries.length; i++) {
+      const [scopeSetName, scopes] = scopeEntries[i];
 
-        const params = new URLSearchParams({
-          grant_type: "refresh_token",
-          client_id: this.clientId,
-          refresh_token: currentRefreshToken,
-          scope: scopes,
-        });
+      if (!scopes || scopes.trim() === "") continue;
 
-        const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: params.toString(),
-        });
+      const params = new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: this.clientId,
+        refresh_token: currentRefreshToken,
+        scope: scopes,
+      });
 
-        if (!response.ok) {
-          throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
-        }
+      const response = await fetch(await this.getTokenEndpointUrl("refresh_token"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: params.toString(),
+      });
 
-        const rawData = await response.json();
-
-        // Parse the token response
-        const data = this.parseTokenResponse(rawData);
-
-        // Update the refresh token for subsequent requests only if a new one is provided
-        // This preserves the existing token if the provider doesn't rotate refresh tokens
-        if (!!data.refresh_token) {
-          currentRefreshToken = data.refresh_token;
-        }
-
-        // Update the token info
-        if (!this.tokenInfo.accessTokens) {
-          this.tokenInfo.accessTokens = {};
-        }
-
-        this.tokenInfo.accessTokens[scopeSetName] = {
-          token: data.access_token,
-          expiresAt: Date.now() + data.expires_in * 1000,
-        };
-
-        // Update ID token and its expiration if present
-        if (data.id_token) {
-          this.tokenInfo.idToken = data.id_token;
-          this.tokenInfo.idTokenExpiresAt = extractTokenExpiration(data.id_token);
-        }
+      if (!response.ok) {
+        throw new Error(`Failed to refresh token for scope set '${scopeSetName}'`);
       }
 
-      // Update the refresh token with the latest one
-      this.tokenInfo.refreshToken = currentRefreshToken;
+      const rawData = await response.json();
 
-      // Update user info from ID token
-      if (this.tokenInfo.idToken) {
-        this.userInfo = extractUserInfo(this.tokenInfo.idToken);
+      // Parse the token response
+      const data = this.parseTokenResponse(rawData);
+
+      // Update the refresh token for subsequent requests only if a new one is provided
+      // This preserves the existing token if the provider doesn't rotate refresh tokens
+      if (!!data.refresh_token) {
+        currentRefreshToken = data.refresh_token;
       }
 
-      // Save tokens to local storage
-      localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
-      this.emitEvent("tokensChanged");
-    } catch (error) {
-      // If any part of the refresh process fails, log out and rethrow
-      this.localLogout();
-      throw error;
+      // Update the token info
+      if (!newTokenInfo.accessTokens) {
+        newTokenInfo.accessTokens = {};
+      }
+
+      newTokenInfo.accessTokens[scopeSetName] = {
+        token: data.access_token,
+        expiresAt: Date.now() + Number(data.expires_in) * 1000,
+      };
+
+      // Update ID token and its expiration if present
+      if (data.id_token) {
+        const idTokenExpiresAt = extractTokenExpiration(data.id_token);
+        newTokenInfo.idToken = data.id_token;
+        newTokenInfo.idTokenExpiresAt = idTokenExpiresAt;
+      }
     }
+
+    // Extract user info from the new ID token
+    const userInfo = newTokenInfo.idToken ? extractUserInfo(newTokenInfo.idToken) : null;
+
+    // Set tokenInfo and userInfo atomically (to avoid inconsistent state)
+
+    // Update the tokens, and update the refresh token with the latest one
+    this.tokenInfo = {
+      ...newTokenInfo,
+      refreshToken: currentRefreshToken,
+    };
+
+    // Update user info from ID token
+    if (userInfo) {
+      this.userInfo = userInfo;
+    }
+
+    // Save tokens to local storage
+    localStorage.setItem(this.tokenKey, JSON.stringify(this.tokenInfo));
+    this.emitEvent("tokensChanged");
   }
 
   /**
