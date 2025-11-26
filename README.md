@@ -289,6 +289,16 @@ function LoginButton() {
 }
 ```
 
+The `logout()` method clears local tokens and redirects to the authentication provider's logout endpoint (if configured). If you want to log out without redirecting to the provider (local logout only), use `localLogout()`:
+
+```typescript
+// Log out and redirect to provider's logout endpoint
+await auth.logout();
+
+// Log out locally without redirecting to provider
+auth.localLogout();
+```
+
 ### Policy-Based Authorization
 
 ```typescript
