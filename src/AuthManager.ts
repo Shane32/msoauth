@@ -396,9 +396,9 @@ class AuthManager<TPolicyNames extends string = string> {
   }
 
   /**
-   * Performs local logout by clearing tokens and cache
+   * Performs local logout by clearing tokens and cache without redirecting to the authentication provider
    */
-  private localLogout(): void {
+  public localLogout(): void {
     if (!this.tokenInfo && !this.userInfo) {
       return;
     }
