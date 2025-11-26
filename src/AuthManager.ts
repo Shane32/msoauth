@@ -92,7 +92,11 @@ class AuthManager<TPolicyNames extends string = string> {
    * Creates a new instance of AuthManager
    * @param {AuthManagerConfiguration} config - Configuration object for the AuthManager
    */
-  constructor(config: AuthManagerConfiguration<TPolicyNames>) {
+  constructor(
+    config: string extends TPolicyNames
+      ? Omit<AuthManagerConfiguration<TPolicyNames>, "policies"> | AuthManagerConfiguration<TPolicyNames>
+      : AuthManagerConfiguration<TPolicyNames>,
+  ) {
     if (!config.redirectUri.startsWith("/")) {
       throw new Error('redirectUri must start with "/"');
     }
@@ -114,7 +118,7 @@ class AuthManager<TPolicyNames extends string = string> {
     this.navigateCallback = config.navigateCallback;
     this.absoluteRedirectUri = `${window.location.origin}${config.redirectUri}`;
     this.absoluteLogoutRedirectUri = config.logoutRedirectUri ? `${window.location.origin}${config.logoutRedirectUri}` : undefined;
-    this.policies = config.policies;
+    this.policies = (config as unknown as AuthManagerConfiguration<TPolicyNames>).policies || {};
 
     // Initialize scopes as requested
     this.defaultScopes = config.scopes;

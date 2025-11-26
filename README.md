@@ -107,7 +107,7 @@ function useAuth(): AuthManager<keyof typeof Policies> {
 export default useAuth;
 ```
 
-5. Configure your APIs to use the access tokens provided by `AuthManager`:
+5. Configure your APIs to use the access tokens (or id tokens) provided by `AuthManager`:
 
 Below is a sample of usage with the `@shane32/graphql` library:
 
@@ -143,8 +143,8 @@ const client = new GraphQLClient({
 });
 
 // Listen for auth events to reset GraphQL client store
-authManager.addEventListener("login", () => client.ResetStore());
-authManager.addEventListener("logout", () => client.ResetStore());
+authManager.addEventListener("login", () => client.resetStore());
+authManager.addEventListener("logout", () => client.resetStore());
 ```
 
 Below is a sample of GraphiQL configuration:
