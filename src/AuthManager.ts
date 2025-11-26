@@ -503,7 +503,10 @@ class AuthManager<TPolicyNames extends string = string> {
       };
     }
 
-    const newTokenInfo = { ...this.tokenInfo };
+    const newTokenInfo = {
+      ...this.tokenInfo,
+      accessTokens: { ...this.tokenInfo.accessTokens },
+    };
 
     // Refresh tokens for all scope sets
     // Note: if refresh fails, we do not log out the user automatically; just throw an error
@@ -545,10 +548,6 @@ class AuthManager<TPolicyNames extends string = string> {
       }
 
       // Update the token info
-      if (!newTokenInfo.accessTokens) {
-        newTokenInfo.accessTokens = {};
-      }
-
       newTokenInfo.accessTokens[scopeSetName] = {
         token: data.access_token,
         expiresAt: Date.now() + Number(data.expires_in) * 1000,
