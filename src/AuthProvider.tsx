@@ -1,6 +1,6 @@
 import React, { ReactNode, useEffect, useState } from "react";
 import AuthManager from "./AuthManager";
-import AuthContext from "./AuthContext";
+import AuthContext, { AuthContextValue } from "./AuthContext";
 
 interface IProps {
   authManager: AuthManager;
@@ -8,12 +8,15 @@ interface IProps {
 }
 
 function AuthProvider({ authManager, children }: IProps) {
-  // trigger a re-render when the auth state changes
-  const [, setTrigger] = useState({});
+  // Create a wrapper object that changes on each auth state change to trigger context updates
+  const [contextValue, setContextValue] = useState<AuthContextValue>(() => ({
+    authManager,
+  }));
 
   useEffect(() => {
     const handleAuthChange = () => {
-      setTrigger({});
+      // Create a new wrapper object to trigger context updates across the app
+      setContextValue({ authManager });
     };
 
     // Subscribe to auth events
@@ -30,7 +33,7 @@ function AuthProvider({ authManager, children }: IProps) {
     };
   }, [authManager]);
 
-  return <AuthContext.Provider value={authManager}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;
 }
 
 export default AuthProvider;

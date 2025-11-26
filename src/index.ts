@@ -1,4 +1,4 @@
-export { default as AuthContext } from "./AuthContext";
+export { default as AuthContext, AuthContextValue } from "./AuthContext";
 export {
   default as AuthManager,
   AuthManagerConfiguration,
