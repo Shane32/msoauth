@@ -84,6 +84,10 @@ class ProxyAuthManager<TPolicyNames extends string = string> extends AuthManager
     throw new Error("No active provider. Use a specific provider to log out.");
   }
 
+  public localLogout(): void {
+    throw new Error("No active provider. Use a specific provider to perform local logout.");
+  }
+
   public async getAccessToken(scopeSetName: string = "default"): Promise<string> {
     throw new Error(`No active provider. Use a specific provider to get an access token.`);
   }
