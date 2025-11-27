@@ -12,7 +12,11 @@ class MsAuthManager<TPolicyNames extends string = string> extends AuthManager<TP
    * Creates a new instance of MsAuthManager
    * @param {AuthManagerConfiguration} config - Configuration object for the MsAuthManager
    */
-  constructor(config: AuthManagerConfiguration<TPolicyNames>) {
+  constructor(
+    config: string extends TPolicyNames
+      ? Omit<AuthManagerConfiguration<TPolicyNames>, "policies"> | AuthManagerConfiguration<TPolicyNames>
+      : AuthManagerConfiguration<TPolicyNames>,
+  ) {
     // Add Microsoft-specific scopes to the configuration
     const msConfig = { ...config };
 

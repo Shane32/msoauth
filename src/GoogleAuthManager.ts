@@ -23,7 +23,11 @@ class GoogleAuthManager<TPolicyNames extends string = string> extends AuthManage
    * Creates a new instance of GoogleAuthManager
    * @param {GoogleAuthManagerConfiguration} config - Configuration object for the GoogleAuthManager
    */
-  constructor(config: GoogleAuthManagerConfiguration<TPolicyNames>) {
+  constructor(
+    config: string extends TPolicyNames
+      ? Omit<GoogleAuthManagerConfiguration<TPolicyNames>, "policies"> | GoogleAuthManagerConfiguration<TPolicyNames>
+      : GoogleAuthManagerConfiguration<TPolicyNames>,
+  ) {
     // Validate proxyUrl
     if (!config.proxyUrl) {
       throw new Error("proxyUrl is required for GoogleAuthManager");
