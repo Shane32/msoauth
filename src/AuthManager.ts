@@ -76,6 +76,8 @@ class AuthManager<TPolicyNames extends string = string> {
 
   private tokenInfo: TokenInfo | null = null;
   private refreshPromise: Promise<void> | null = null;
+  private redirectPromise: Promise<void> | null = null;
+  private redirectKey: string | null = null;
   private eventListeners: Map<AuthEventType, Set<AuthEventListener>> = new Map();
   protected configManager: OpenIDConfigurationManager;
   private readonly absoluteRedirectUri: string;
@@ -269,14 +271,26 @@ class AuthManager<TPolicyNames extends string = string> {
    * If only one scope set exists, uses the returned tokens directly
    * @throws {Error} If authorization code is missing or invalid
    */
-  public async handleRedirect(): Promise<void> {
-    // Parse the query string
+  public handleRedirect(): Promise<void> {
     const queryParams = new URLSearchParams(window.location.search);
     const code = queryParams.get("code");
     if (!code) {
-      throw new Error("No authorization code found");
+      return Promise.reject(new Error("No authorization code found"));
     }
 
+    // StrictMode can call this twice before the first token exchange finishes.
+    // Share the result for this callback, including after the exchange settles.
+    const redirectKey = JSON.stringify([code, queryParams.get("state")]);
+    if (this.redirectKey === redirectKey && this.redirectPromise) {
+      return this.redirectPromise;
+    }
+
+    this.redirectKey = redirectKey;
+    this.redirectPromise = this.handleRedirectInternal(queryParams, code);
+    return this.redirectPromise;
+  }
+
+  private async handleRedirectInternal(queryParams: URLSearchParams, code: string): Promise<void> {
     // Get stored code verifier
     const codeVerifier = localStorage.getItem(this.verifierKey);
     if (!codeVerifier) {
