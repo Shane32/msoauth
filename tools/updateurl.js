@@ -17,7 +17,7 @@ const args = process.argv.slice(2);
 const authorRepo = args[0].toLowerCase();
 file.name = "@" + authorRepo;
 file.version = args[1];
-file.repository.url = "git@github.com:" + authorRepo + ".git";
+file.repository.url = "https://github.com/" + args[0];
 file.bugs.url = "https://github.com/" + authorRepo + "/issues";
 file.homepage = "https://github.com/" + authorRepo;
 
