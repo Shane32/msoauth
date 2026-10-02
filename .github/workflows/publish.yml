@@ -8,6 +8,11 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
       - name: Check github.ref starts with 'refs/tags/'
@@ -26,10 +31,10 @@ jobs:
       - name: Setup .npmrc file to publish to npm
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-      - name: Install npm@10
-        run: npm i -g npm@10
+      - name: Install npm@11
+        run: npm i -g npm@^11.5.1
       - name: Install modules
         run: npm ci
       - name: Build
@@ -42,12 +47,10 @@ jobs:
         run: node tools/prepare-publish
       - name: Publish to npm
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Setup .npmrc file to publish to GitHub Packages
         uses: actions/setup-node@v4
         with:
-          node-version: '18.x'
+          node-version: '24'
           registry-url: 'https://npm.pkg.github.com'
       - name: Publish to GitHub Packages
         run: npm publish
